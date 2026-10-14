@@ -86,4 +86,70 @@ static void fuzz(void) {
         CHECK(r.received <= TUNA_CAPACITY);
     }
 }
-int main(void) { format_codec(); transfer_player(); resampler(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, malformed input)\n", checks); return 0; }
+static void boundaries(void) {
+    uint8_t block[132], *track; int16_t pcm[257]; TunaPlayer player; TunaTrack info;
+    int8_t output[300]; size_t length; unsigned i; TunaReceiver r; TunaPacket p;
+    for (i = 0; i < 257; ++i) pcm[i] = (int16_t)((int)i * 128 - 16384);
+    CHECK(tuna_convert_pcm(pcm, 257, TUNA_RATE, "Partial block", &track, &length) == TUNA_OK);
+    CHECK(length == 360); CHECK(tuna_track_validate(track, length, &info) == TUNA_OK);
+    tuna_player_init(&player, track + 96, 257); tuna_player_key(&player, 1);
+    CHECK(tuna_player_render(&player, output, 300) == 257); CHECK(player.position == 257);
+    for (i = 257; i < 300; ++i) CHECK(output[i] == 0);
+    tuna_receiver_init(&r, storage, sizeof(storage)); transact(&r, TUNA_BEGIN, 0, 0, track, 96);
+    p = transact(&r, TUNA_DATA, 1, UINT32_MAX, track + 96, 1); CHECK(p.type == TUNA_NACK && r.received == 0);
+    transact(&r, TUNA_DATA, 1, 0, track + 96, 256);
+    track[100] ^= 1;
+    p = transact(&r, TUNA_DATA, 1, 0, track + 96, 256); CHECK(p.type == TUNA_NACK && r.received == 256);
+    transact(&r, TUNA_DATA, 2, 256, track + 352, 8);
+    storage[100] ^= 1;
+    p = transact(&r, TUNA_COMMIT, 3, 264, NULL, 0); CHECK(p.type == TUNA_NACK && r.state == TUNA_FAILED);
+    free(track);
+    CHECK(tuna_convert_pcm(pcm, 257, 0, "Invalid rate", &track, &length) == TUNA_FORMAT);
+    CHECK(tuna_convert_pcm(pcm, UINT32_MAX, 8192, "Oversize", &track, &length) == TUNA_SIZE);
+    CHECK(!track && !length);
+    memset(block, 0, sizeof(block)); block[131] = 0x10;
+    CHECK(tuna_adpcm_decode(block, pcm) == TUNA_FORMAT);
+    { FILE *f = fopen("malformed-test.mp3", "wb"); CHECK(f != NULL); CHECK(fwrite("ID3\4\0\0\x7f\x7f\x7f\x7f", 1, 10, f) == 10); CHECK(!fclose(f));
+      CHECK(tuna_convert_mp3("malformed-test.mp3", "Bad metadata", 0, &track, &length) == TUNA_FORMAT); CHECK(!remove("malformed-test.mp3")); }
+    CHECK(tuna_convert_mp3("__missing_tuna_test__.mp3", "Unavailable", 0, &track, &length) == TUNA_IO);
+    CHECK(tuna_convert_mp3("__missing_tuna_test__.mp3", "Too long excerpt", 301, &track, &length) == TUNA_SIZE);
+    CHECK(tuna_boot_key(0) == 0); CHECK(tuna_boot_key(513) == 0); CHECK(tuna_boot_key(0x40008) == 0);
+    CHECK(tuna_boot_key(0x200) == 0xcbe1cfd9); /* independent FIX94 vector */
+    { uint32_t key = 0; CHECK(tuna_boot_encrypt(0, 0xc0, &key) == 0xdd869d61); }
+}
+static void adaptive_profiles(void) {
+    TunaTrack t, parsed; uint8_t block[132], *track; int16_t decoded[256];
+    int16_t *pcm; size_t length; TunaPlayer p; int8_t output[256]; unsigned i;
+    memset(&t, 0, sizeof(t));
+    CHECK(tuna_choose_profile(40 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_IMA4 && t.rate == 8192);
+    CHECK(tuna_choose_profile(60 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_ADPCM2 && t.rate == 8192);
+    CHECK(tuna_choose_profile(180 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_ADPCM2 && t.rate == 4096);
+    CHECK(t.bytes + 96 == 195936);
+    CHECK(tuna_choose_profile(300 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_DELTA1 && t.rate == 4096);
+    CHECK(t.bytes + 96 == 172896);
+    CHECK(tuna_choose_profile(301 * 48000, 48000, &t) == TUNA_SIZE);
+    memset(block, 0, sizeof(block)); block[4] = 0x0d;
+    CHECK(tuna_block_decode(TUNA_ADPCM2, block, decoded) == TUNA_OK);
+    CHECK(decoded[1] == 10 && decoded[2] == -6);
+    memset(block, 0, sizeof(block)); block[4] = 3;
+    CHECK(tuna_block_decode(TUNA_DELTA1, block, decoded) == TUNA_OK);
+    CHECK(decoded[1] == 7 && decoded[2] == 14);
+    block[2] = 255; CHECK(tuna_block_decode(TUNA_DELTA1, block, decoded) == TUNA_FORMAT);
+    pcm = (int16_t *)malloc(300u * 4096 * sizeof(int16_t)); CHECK(pcm != NULL);
+    for (i = 0; i < 300u * 4096; ++i) pcm[i] = (int16_t)(10000 * sin(6.283185307179586 * 220 * i / 4096));
+    CHECK(tuna_convert_pcm(pcm, 300u * 4096, 4096, "Complete five-minute tone", &track, &length) == TUNA_OK);
+    CHECK(length == 172896); CHECK(tuna_track_validate(track, length, &parsed) == TUNA_OK);
+    CHECK(parsed.samples == 1228800 && parsed.codec == TUNA_DELTA1 && parsed.rate == 4096);
+    tuna_player_init_track(&p, track + 96, &parsed); tuna_player_key(&p, 1);
+    while (p.state == TUNA_PLAYING) CHECK(tuna_player_render(&p, output, 256) == 256);
+    CHECK(p.position == 300u * 4096);
+    /* Report error as a diagnostic, not a subjective music-quality acceptance. */
+    for (i = TUNA_ADPCM2; i <= TUNA_DELTA1; ++i) {
+        double signal = 0, error = 0; unsigned j;
+        tuna_block_encode((uint8_t)i, pcm, 256, block); CHECK(tuna_block_decode((uint8_t)i, block, decoded) == TUNA_OK);
+        for (j = 0; j < 256; ++j) { double d = pcm[j] - decoded[j]; signal += (double)pcm[j] * pcm[j]; error += d * d; }
+        CHECK(error < signal); printf("Profile %u / 220 Hz tone SNR: %.2f dB (not music acceptance)\n", i, 10 * log10(signal / error));
+    }
+    free(track); free(pcm);
+}
+int main(void) { format_codec(); transfer_player(); resampler(); boundaries(); adaptive_profiles(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, malformed input)\n", checks); return 0; }

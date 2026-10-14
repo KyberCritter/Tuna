@@ -10,9 +10,9 @@ No native structure is serialized. Unknown versions/profiles are rejected.
 | 0 | 4 | ASCII `TUNA` |
 | 4 | 2 | version = 1 |
 | 6 | 2 | header length = 96 |
-| 8 | 1 | codec = 1 (mono IMA ADPCM) |
+| 8 | 1 | codec = 1 (IMA4), 2 (custom ADPCM2), 3 (adaptive DELTA1) |
 | 9 | 3 | zero |
-| 12 | 4 | rate = 8192 |
+| 12 | 4 | rate = 8192 or 4096, constrained by codec |
 | 16 | 4 | exact decoded sample count, nonzero |
 | 20 | 4 | encoded payload bytes |
 | 24 | 1 | title length, 0..60 |
@@ -23,11 +23,23 @@ No native structure is serialized. Unknown versions/profiles are rejected.
 | 96 | variable | independent ADPCM blocks |
 
 CRC32 uses reflected IEEE polynomial 0xedb88320, initial/final XOR 0xffffffff.
-Each 132-byte block represents 256 samples: predictor (2), index (1, 0..88),
-reserved zero (1), 255 nibbles (128 bytes, low nibble first). Predictor is the
-first decoded sample. Final unused high nibble is zero. The last block is padded;
-only the header's exact sample count is played. Total container must fit 192 KiB.
-Maximum 380,928 samples / 46.5 seconds; no ordinary full-song guarantee.
+Every independent block represents 256 samples: predictor (2), index (1, 0..88),
+reserved zero (1), then 255 codes packed least-significant bits first. Predictor
+is the first decoded sample. Unused high bits of the last byte are zero. The last
+block is padded; only the exact sample count is played. Container fits 192 KiB;
+decoded duration is bounded to 300 seconds. The IMA step table is in `shared/adpcm.c`.
+
+| Profile | Block bytes | Allowed rate | Adaptation |
+| --- | --- | --- | --- |
+| IMA4 | 132 | 8192 | standard 4-bit IMA predictor/index |
+| ADPCM2 | 68 | 8192, 4096 | bit 1 sign, bit 0 magnitude: step/2 or 3*step/2; index -1 or +4 |
+| DELTA1 | 36 | 4096 | 1 positive/0 negative, delta=step; index +2 for repeated sign, -2 for changed sign |
+
+All predictor updates saturate to signed 16-bit, indices clamp to 0..88.
+DELTA1 resets previous sign to 0 at every block; ADPCM2/DELTA1 initial index is
+the first step >= abs(sample1-sample0), or 88. Integer divisions truncate toward
+zero. Custom profiles are **not** standard IMA. Three-minute complete tracks fit
+ADPCM2/4096 in 195,936 bytes; five-minute DELTA1/4096 in 172,896 bytes.
 
 ## Packets
 
@@ -36,7 +48,8 @@ sequence (4), offset (4), CRC32 (4). CRC covers first 16 bytes followed by body.
 Maximum body 256 bytes. Joybus words carry four consecutive packet bytes,
 with zero padding in the last word (not included in packet length or CRC).
 
-Types are enumerated in `include/tuna.h`. HELLO returns CAPS (capacity/rate).
+Types are enumerated in `include/tuna.h`. HELLO returns CAPS (12 bytes:
+capacity, maximum seconds=300, supported codec bitmask=14, all u32).
 BEGIN carries the full track header, sequence/offset zero. DATA sequences start
 at 1 with contiguous payload offsets. ACK reports accepted payload offset.
 The immediately previous DATA is idempotent if its sequence/offset/content match.

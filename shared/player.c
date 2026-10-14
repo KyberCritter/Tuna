@@ -3,7 +3,10 @@
 
 void tuna_player_init(TunaPlayer *p, const uint8_t *payload, uint32_t samples) {
     memset(p, 0, sizeof(*p)); p->payload = payload; p->samples = samples;
-    p->block = UINT32_MAX; p->state = TUNA_PAUSED;
+    p->block = UINT32_MAX; p->state = TUNA_PAUSED; p->codec = TUNA_IMA4;
+}
+void tuna_player_init_track(TunaPlayer *p, const uint8_t *payload, const TunaTrack *track) {
+    tuna_player_init(p, payload, track->samples); p->codec = track->codec;
 }
 void tuna_player_key(TunaPlayer *p, int a_down) {
     if (a_down && !p->a_held) {
@@ -19,7 +22,7 @@ size_t tuna_player_render(TunaPlayer *p, int8_t *out, size_t count) {
     while (i < count && p->position < p->samples) {
         uint32_t block = p->position / TUNA_BLOCK_SAMPLES;
         if (block != p->block) {
-            if (tuna_adpcm_decode(p->payload + block * TUNA_BLOCK_BYTES, p->decoded)) { p->state = TUNA_ENDED; break; }
+            if (tuna_block_decode(p->codec, p->payload + block * tuna_profile_block(p->codec), p->decoded)) { p->state = TUNA_ENDED; break; }
             p->block = block;
         }
         out[i++] = (int8_t)(p->decoded[p->position % TUNA_BLOCK_SAMPLES] / 256); ++p->position;

@@ -22,6 +22,10 @@
 - RAM contents disappear on power-off/reset. Pausing must not invoke BIOS STOP.
 - Do not silently truncate a song. Reject tracks that cannot fit, or offer an
   explicit user-approved excerpt mode with the actual duration shown.
+- Required complete-track range: up to five minutes. Choose compression and
+  sample rate from decoded duration and framed byte size; use approximately
+  three minutes as the default planning target. Show the selected quality profile.
+  Source filesize bounds decoder memory; it is not a reliable duration estimate.
 
 ## Architecture and stack
 
@@ -51,12 +55,12 @@ initially 192 KiB EWRAM for compressed audio and the remaining 64 KiB for the
 resident image, state, buffers, metadata, and safety margin. Determine the actual
 limit from linker maps and runtime stack/buffer checks, not this estimate.
 
-Start with mono 4-bit IMA ADPCM at 8,192 Hz: approximately 4 KiB/s, so 192 KiB
+Retain mono 4-bit IMA ADPCM at 8,192 Hz for short tracks: approximately 4 KiB/s, so 192 KiB
 holds slightly less than 48 seconds after block headers. Timer rate divides the
 GBA clock exactly; use a sample-counting timer for buffer boundaries rather than
 assuming a whole number of samples per display frame.
 
-This is a bring-up codec, NOT a solution for every complete song. With 192 KiB,
+That profile alone is NOT a solution for complete typical songs. With 192 KiB,
 three minutes needs <=8.74 kbit/s INCLUDING framing overhead; four minutes needs
 <=6.55 kbit/s. Supporting ordinary-length MP3 music as complete RAM tracks requires
 a much lower-rate codec with acceptable sound and real-time ARM7 performance.
@@ -65,12 +69,21 @@ Evaluate fixed-point low-bitrate codecs separately. Speech codecs such as GSM or
 Codec2 may damage music badly and are not assumed fast enough on a 16.78 MHz
 ARM7TDMI. Opus/MP3 are not assumed feasible merely because portable code exists.
 Benchmark compiled code, total footprint, worst-case cycles, and listening quality
-on representative music. A measured codec decision precedes any full-song claim.
-3-bit ADPCM is an experimental custom profile, not standard 4-bit IMA compatibility.
+on representative music. A measured codec decision precedes a quality/performance
+acceptance claim. Custom low-bit profiles are not standard IMA compatibility.
+
+The implementation selects the highest-quality fitting profile from 4-bit IMA at
+8192 Hz, custom 2-bit ADPCM at 8192 Hz, 2-bit ADPCM at 4096 Hz, and 1-bit adaptive
+delta at 4096 Hz. Three-minute tracks use 2-bit/4096 (195,936 framed bytes);
+five-minute tracks use 1-bit/4096 (172,896 bytes). Low-rate profiles are explicitly
+lo-fi; 4096 Hz retains only a narrow music bandwidth. Host conversion/replay proves
+size and sample-count feasibility, not representative listening quality or ARM7
+worst-case timing. Preserve those acceptance gates rather than reducing the
+five-minute requirement to a short-jingle-only deliverable.
 
 For the guaranteed first acceptance track, use an original complete short jingle
 that fits, not a silently cropped commercial song. If typical full-length songs
-are mandatory, codec feasibility is a project go/no-go gate. A flashcart/extra
+are mandatory, measured codec quality/performance remains a go/no-go gate. A flashcart/extra
 storage would change the requested RAM-only model and needs separate approval.
 
 ## Link and container

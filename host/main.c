@@ -7,13 +7,13 @@ int main(int argc, char **argv) {
     const char *output;
     if (argc == 3 && !strcmp(argv[1], "--jingle")) { e = tuna_make_jingle(&track, &length); output = argv[2]; }
     else if (argc == 3 || (argc == 5 && !strcmp(argv[3], "--excerpt"))) {
-        if (argc == 5) { char *end; unsigned long v = strtoul(argv[4], &end, 10); if (*end || !v || v > 46) { fprintf(stderr, "Excerpt must be 1..46 seconds.\n"); return 2; } excerpt = (unsigned)v; }
+        if (argc == 5) { char *end; unsigned long v = strtoul(argv[4], &end, 10); if (*end || !v || v > 300) { fprintf(stderr, "Excerpt must be 1..300 seconds.\n"); return 2; } excerpt = (unsigned)v; }
         e = tuna_convert_mp3(argv[1], argv[1], excerpt, &track, &length); output = argv[2];
-    } else { fprintf(stderr, "Usage: tuna-convert input.mp3 output.tuna [--excerpt 1..46]\n       tuna-convert --jingle output.tuna\n"); return 2; }
+    } else { fprintf(stderr, "Usage: tuna-convert input.mp3 output.tuna [--excerpt 1..300]\n       tuna-convert --jingle output.tuna\n"); return 2; }
     if (e) { fprintf(stderr, "%s; nothing written.\n", tuna_error(e)); return 1; }
     out = fopen(output, "wb");
     if (!out) { free(track); return 1; }
     { int failed = fwrite(track, 1, length, out) != length; if (fclose(out)) failed = 1; if (failed) { free(track); return 1; } }
-    printf("%s: %lu bytes, %.3f seconds%s\n", output, (unsigned long)length, (double)tuna_u32(track + 16) / TUNA_RATE, excerpt ? " (explicit excerpt)" : " (complete decoded track)");
+    printf("%s: %lu bytes, %.3f seconds%s; %s at %lu Hz\n", output, (unsigned long)length, (double)tuna_u32(track + 16) / tuna_u32(track + 12), excerpt ? " (explicit excerpt)" : " (complete decoded track)", tuna_profile_name(track[8]), (unsigned long)tuna_u32(track + 12));
     free(track); return 0;
 }

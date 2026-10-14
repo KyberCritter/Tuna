@@ -46,3 +46,54 @@ TunaError tuna_adpcm_decode(const uint8_t in[TUNA_BLOCK_BYTES], int16_t out[TUNA
         out[i] = (int16_t)apply((in[4 + (i - 1) / 2] >> (((i - 1) & 1) * 4)) & 15, &predictor, &index);
     return TUNA_OK;
 }
+/* Custom low-rate profiles, not standard IMA compatibility. All math fits ARM7. */
+static int low_apply(uint8_t codec, unsigned code, int *predictor, int *index, unsigned *previous) {
+    int delta;
+    if (codec == TUNA_ADPCM2) {
+        delta = (steps[*index] * ((code & 1) ? 3 : 1)) / 2;
+        *predictor += (code & 2) ? -delta : delta;
+        *index += (code & 1) ? 4 : -1;
+    } else {
+        delta = steps[*index];
+        *predictor += code ? delta : -delta;
+        *index += code == *previous ? 2 : -2;
+        *previous = code;
+    }
+    if (*predictor > 32767) *predictor = 32767;
+    if (*predictor < -32768) *predictor = -32768;
+    if (*index < 0) *index = 0;
+    if (*index > 88) *index = 88;
+    return *predictor;
+}
+void tuna_block_encode(uint8_t codec, const int16_t *pcm, unsigned count, uint8_t *out) {
+    int predictor = count ? pcm[0] : 0, index = 0; unsigned i, previous = 0, bits = codec == TUNA_ADPCM2 ? 2 : 1;
+    if (codec == TUNA_IMA4) { tuna_adpcm_encode(pcm, count, out); return; }
+    memset(out, 0, tuna_profile_block(codec)); tuna_put16(out, (uint16_t)predictor);
+    /* Choose a block-local initial step to avoid a long attack at every restart. */
+    if (count > 1) {
+        int diff = pcm[1] - predictor; if (diff < 0) diff = -diff;
+        while (index < 88 && steps[index] < diff) ++index;
+    }
+    out[2] = (uint8_t)index;
+    for (i = 1; i < 256; ++i) {
+        int diff = (i < count ? pcm[i] : predictor) - predictor;
+        unsigned code;
+        if (codec == TUNA_ADPCM2) { code = diff < 0 ? 2 : 0; if (diff < 0) diff = -diff; if (diff >= steps[index]) code |= 1; }
+        else code = diff >= 0;
+        low_apply(codec, code, &predictor, &index, &previous);
+        out[4 + ((i - 1) * bits) / 8] |= (uint8_t)(code << (((i - 1) * bits) % 8));
+    }
+}
+TunaError tuna_block_decode(uint8_t codec, const uint8_t *in, int16_t out[TUNA_BLOCK_SAMPLES]) {
+    int predictor = tuna_u16(in), index = in[2]; unsigned i, previous = 0, bits = codec == TUNA_ADPCM2 ? 2 : 1;
+    unsigned block = tuna_profile_block(codec);
+    if (codec == TUNA_IMA4) return tuna_adpcm_decode(in, out);
+    if (!block || index > 88 || in[3] || (in[block - 1] & (codec == TUNA_ADPCM2 ? 0xc0 : 0x80))) return TUNA_FORMAT;
+    if (predictor >= 32768) predictor -= 65536;
+    out[0] = (int16_t)predictor;
+    for (i = 1; i < 256; ++i) {
+        unsigned code = (in[4 + ((i - 1) * bits) / 8] >> (((i - 1) * bits) % 8)) & ((1u << bits) - 1);
+        out[i] = (int16_t)low_apply(codec, code, &predictor, &index, &previous);
+    }
+    return TUNA_OK;
+}

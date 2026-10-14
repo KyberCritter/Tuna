@@ -3,10 +3,13 @@
 
 #define PI 3.14159265358979323846
 int16_t tuna_resample(TunaSampleFn fetch, void *context, uint32_t samples, uint32_t rate, uint32_t index) {
+    return tuna_resample_rate(fetch, context, samples, rate, TUNA_RATE, index);
+}
+int16_t tuna_resample_rate(TunaSampleFn fetch, void *context, uint32_t samples, uint32_t rate, uint32_t output_rate, uint32_t index) {
     double position, cutoff, sum = 0, weights = 0; int tap, radius; int64_t center;
-    if (!samples || !rate) return 0;
-    position = (double)index * rate / TUNA_RATE; center = (int64_t)position;
-    cutoff = 0.90 * (rate > TUNA_RATE ? (double)TUNA_RATE / rate : 1.0);
+    if (!samples || !rate || !output_rate) return 0;
+    position = (double)index * rate / output_rate; center = (int64_t)position;
+    cutoff = 0.90 * (rate > output_rate ? (double)output_rate / rate : 1.0);
     radius = (int)ceil(16.0 / cutoff);
     if (radius > 256) radius = 256;
     for (tap = -radius; tap <= radius; ++tap) {

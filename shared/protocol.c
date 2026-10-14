@@ -27,14 +27,14 @@ void tuna_receiver_init(TunaReceiver *r, uint8_t *storage, uint32_t capacity) {
 }
 void tuna_receiver_fail(TunaReceiver *r, TunaError error) { r->state = TUNA_FAILED; r->error = error; }
 size_t tuna_receiver_packet(TunaReceiver *r, const uint8_t *request, size_t n, uint8_t *reply) {
-    TunaPacket p; uint8_t body[8], type = TUNA_ACK; uint16_t len = 0;
+    TunaPacket p; uint8_t body[12], type = TUNA_ACK; uint16_t len = 0;
     TunaError e = tuna_packet_read(&p, request, n); uint32_t seq = n >= 12 ? tuna_u32(request + 8) : 0;
     if (e) goto nack;
     seq = p.seq;
     switch (p.type) {
     case TUNA_HELLO:
         if (p.length) { e = TUNA_FORMAT; break; }
-        type = TUNA_CAPS; len = 8; tuna_put32(body, r->capacity); tuna_put32(body + 4, TUNA_RATE); break;
+        type = TUNA_CAPS; len = 12; tuna_put32(body, r->capacity); tuna_put32(body + 4, TUNA_MAX_SECONDS); tuna_put32(body + 8, 14); break;
     case TUNA_BEGIN:
         if (p.length != TUNA_HEADER || p.seq || p.offset) { e = TUNA_FORMAT; break; }
         if ((r->state == TUNA_RECEIVE || r->state == TUNA_VERIFIED) && !memcmp(r->storage, p.body, TUNA_HEADER)) break;
