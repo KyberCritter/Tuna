@@ -1,0 +1,40 @@
+# Downloaded reference material (including third-party source snapshots)
+/.agents/docs/
+
+# Local tools, BIOS dumps, emulator profiles, media, test evidence
+/.local/
+/artifacts/
+/media/
+/sdcard/
+*.local.json
+*.local.ps1
+
+# C/C++ and devkitPro build products
+**/build/
+/dist/
+*.o
+*.a
+*.d
+*.elf
+*.dol
+*.gba
+*.mb
+*.map
+*.sav
+*.ss[0-9]
+compile_commands.json
+.cache/
+.vscode/
+.idea/
+
+# Host-side tooling, if introduced
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+node_modules/
+
+# OS/editor state
+.DS_Store
+Thumbs.db
+*.swp
