@@ -15,3 +15,8 @@ Tuna is based in part on the work of the devkitPro project, including unmodified
 libgba (LGPL with its static-linking exception) and libogc. Console packages
 include their installed license notices. Toolchain/runtime components retain
 their original licenses; the repository's MIT license applies to Tuna's own code.
+
+The C build helper and SHA-256 implementation in `tools/` are Tuna's original
+MIT code (SHA-256 follows the published FIPS 180-4 specification). GNU Make and
+GCC are separately licensed build tools, not code incorporated into Tuna by
+running the build. Their use does not relicense Tuna's source under the GPL.

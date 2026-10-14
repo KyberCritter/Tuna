@@ -1,26 +1,38 @@
 # Build and run
 
-## Single Windows entry point
+## Single cross-platform entry point
 
-Install Visual Studio C++ build tools and devkitPro's `gba-dev`, `gamecube-dev`,
-and `wii-dev` groups using the official [getting-started instructions](https://devkitpro.org/wiki/Getting_Started).
-Keep devkitPro's managed MSYS2 environment. No BIOS is needed to compile.
+Use GNU Make, a host GCC/Clang compiler, and devkitPro's `gba-dev`, `gamecube-dev`,
+and `wii-dev` groups from the official [getting-started instructions](https://devkitpro.org/wiki/Getting_Started).
+No Python, PowerShell, CMake or BIOS is needed to build.
 
-```powershell
-.\Build.ps1                         # unit tests + GBA + GC + Wii + dist package
-.\Build.ps1 -Target Host            # unit tests + desktop converter, no devkitPro
-.\Build.ps1 -DevkitPro D:\devkitPro # explicit tool installation
+```sh
+make -j4     # unit tests + GBA + GC + Wii + dist package
+make host    # desktop converter + unit tests, no devkitPro required
+make gba     # GBA + memory/heap/IRQ checks
+make gamecube
+make wii
 ```
 
-Targets `Gba`, `GameCube`, and `Wii` build only the requested console lane plus
-its prerequisites. A missing compiler/library is an error, not a skipped pass.
-`-MsysBash` selects an existing managed MSYS2 `usr\bin\bash.exe` when necessary.
-Nothing is installed or downloaded by the build. Project-local tools are detected
-before the default `D:\devkitPro` path.
+Linux/macOS: install GNU Make and GCC/Clang (Apple Clang works), then source the
+devkitPro environment. Set `DEVKITPRO` if your installation is not `/opt/devkitpro`.
+`DEVKITARM`/`DEVKITPPC` default to its toolchain subdirectories. Select host compiler
+and flags with standard `CC`/`CFLAGS`, e.g. `make host CC=clang`.
+
+Windows: run the same commands in devkitPro's MSYS2 **UCRT64 shell**. Install host
+tools with `pacman -S --needed make mingw-w64-ucrt-x86_64-gcc`. Keep the managed
+devkitPro/MSYS2 environment; do not run a Unix Makefile directly in cmd/PowerShell.
+The required POSIX utilities (`mkdir`, `cp`) come with MSYS2 and Unix systems.
+Console Make rules, including upstream devkitPro rules, require project/toolchain
+paths without whitespace. Host targets do not need console toolchains.
+
+Missing compilers/libraries fail the build instead of silently skipping a target.
+Nothing is installed or downloaded by Make. `Build.ps1` is only an optional legacy
+Windows convenience wrapper; it delegates to this Makefile, not a second build.
 
 Outputs:
 
-- `build/host/tests.exe`, `tuna-convert.exe`, `jingle.tuna`
+- `build/host/tests`, `tuna-convert`, `tuna-build`, `jingle.tuna` (`.exe` on Windows)
 - `build/gba/tuna.mb`, `tuna.elf`, `tuna.map`
 - `build/gamecube/tuna.dol` and `build/wii/tuna.dol`, ELF/map files
 - `dist/apps/tuna/boot.dol` + HBC metadata (Wii), `dist/tuna-gamecube.dol`
@@ -31,9 +43,13 @@ Each sender embeds the freshly built multiboot image. Linker assertions reserve
 and retain IWRAM stack/BIOS headroom. The reserved track is NOLOAD: it must not
 inflate the multiboot image. GBA code performs no heap allocation.
 
-On Linux/macOS, `make host` builds the portable converter and unit tests with a
-system GCC/Clang. Console Makefiles expect the standard devkitPro environment;
-the Windows orchestration additionally generates `build/generated/player_image.c`.
+Make compiles `tools/build_tool.c` and `tools/sha256.c` with the host C compiler.
+This MIT-licensed helper embeds `build/generated/player_image.c/.h`, validates
+GBA symbols/image size, and generates the package SHA256 manifest. SHA-256 golden
+vectors and memory-gate tests run alongside the application tests. Generated
+embedding files retain timestamps when unchanged, enabling incremental builds.
+GNU Make/GCC are build tools; their GPL licenses do not relicense Tuna's source.
+Linked libraries keep their own notices/exceptions (see `third_party/README.md`).
 
 ## Sender usage
 
@@ -61,12 +77,16 @@ the sender; native GC deployment requires an existing suitable loader, not HBC.
 
 ## Desktop conversion
 
-```powershell
-.\build\host\tuna-convert.exe song.mp3 song.tuna
-.\build\host\tuna-convert.exe song.mp3 excerpt.tuna --excerpt 30
-.\build\host\tuna-convert.exe --jingle jingle.tuna
-.\scripts\Test-Mp3.ps1 -Ffmpeg 'D:\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe'
+```sh
+./build/host/tuna-convert song.mp3 song.tuna
+./build/host/tuna-convert song.mp3 excerpt.tuna --excerpt 30
+./build/host/tuna-convert --jingle jingle.tuna
 ```
+
+Add `.exe` when invoking directly from a Windows shell. The optional Windows
+fixture/emulator helpers in `scripts/*.ps1` remain platform-specific; they are
+not prerequisites for `make`. `scripts/Test-Mp3.ps1` can generate longer MP3
+fixtures with FFmpeg for the separate media regression lane.
 
 Decoder input is bounded to 16 MiB, ID3v2 metadata to 1 MiB. Two decode passes use
 a fixed 4096-sample mono ring instead of allocating five minutes of PCM, so native
@@ -86,8 +106,8 @@ Titles are bounded printable ASCII; non-ASCII filename bytes become `?`.
 
 `.opencode/skills/tuna-regression/` bundles repeatable guidance and a script:
 
-```powershell
-.\.opencode\skills\tuna-regression\scripts\Verify.ps1 -Target Host
+```sh
+sh .opencode/skills/tuna-regression/scripts/Verify.sh host
 ```
 
 The script preserves build logs and revision/status in ignored `artifacts/`.

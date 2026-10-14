@@ -1,7 +1,7 @@
 # Executable local development plan (Windows)
 
 Implementation update: console sources, adaptive five-minute conversion, host
-tests and the single `Build.ps1` entry point now exist. Managed devkitPro tools
+tests and the single GNU Make entry point now exist. Managed devkitPro tools
 were provisioned without admin changes under `.local/tools/msys64/opt/devkitpro`;
 all three cross-builds pass. Dolphin was found at `D:\Dolphin\Dolphin.exe`.
 The original observations below are retained as historical setup context.

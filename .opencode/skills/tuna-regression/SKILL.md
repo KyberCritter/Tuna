@@ -4,7 +4,9 @@ description: Build and test Tuna changes, record evidence, and checkpoint comple
 ---
 
 1. Read `docs/build.md`, `docs/validation.md`, and `git status --short` at the project root.
-2. Run `scripts/Verify.ps1` beside this skill. It invokes the repository build/test scripts and saves a report in ignored `artifacts/`.
+2. Run `sh scripts/Verify.sh host` beside this skill (or omit `host` for all targets).
+   It invokes the root GNU Makefile and saves a report in ignored `artifacts/`.
+   `Verify.ps1` remains an optional Windows wrapper, not the portable build path.
    For real MP3 fixtures run root `scripts/Test-Mp3.ps1` with a verified FFmpeg.
    Root `scripts/Test-Gba.ps1` is a separate embedded-fixture/HLE/GDB lane; it is
    currently blocked on the installed SDL build's missing GDB listener and must

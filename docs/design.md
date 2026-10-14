@@ -30,8 +30,10 @@
 ## Architecture and stack
 
 Use devkitPPC + libogc/libfat for Wii/GameCube, devkitARM + libgba or libtonc for GBA,
-C for shared codec/format code, and a small C++ Wii UI if useful. Use Make and
-PowerShell orchestration; avoid additional frameworks until needed.
+C for shared codec/format code, and a small C++ Wii UI if useful. GNU Make is the
+single portable build entry point; small C helpers handle embedding/checksums.
+Optional Windows emulator helpers may use PowerShell, but building must not
+require PowerShell or Python. Avoid additional frameworks until needed.
 
 Wii pipeline: filesystem source -> MP3 decode -> stereo downmix -> anti-aliased
 resampling -> encode -> size/quality preview -> multiboot -> runtime transfer.

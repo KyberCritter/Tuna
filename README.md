@@ -20,12 +20,15 @@ have passed locally. **BIOS multiboot, audible GBA DMA playback, cable disconnec
 and representative music quality are not yet validated.** A legal user-supplied
 GBA BIOS and hardware/emulator acceptance runs are still required.
 
-```powershell
-.\Build.ps1              # tests + all three console targets + dist package
-.\Build.ps1 -Target Host # desktop tests/converter only
+```sh
+make       # tests + all three console targets + dist package
+make host  # desktop tests/converter only
 ```
 
-Requires Visual Studio C++ tools and devkitPro gba-dev/gamecube-dev/wii-dev.
+Requires GNU Make, a host GCC/Clang compiler, and devkitPro
+gba-dev/gamecube-dev/wii-dev. Use the devkitPro/MSYS2 UCRT64 shell on Windows.
+No Python or PowerShell is required for the build; embedding, memory validation
+and SHA256 manifests use a small MIT-licensed C helper.
 Built Wii HBC files are in `dist/apps/tuna/`; GC DOL in `dist/tuna-gamecube.dol`.
 Tuna is based in part on the work of the devkitPro project (libgba/libogc).
 
@@ -33,6 +36,7 @@ Tuna is based in part on the work of the devkitPro project (libgba/libogc).
 - [Build, controls and conversion](docs/build.md)
 - [Wire format](docs/wire-format.md)
 - [Validation and acceptance gates](docs/validation.md)
+- [Verified CI action pins](docs/ci-dependencies.md)
 - [Windows development and emulator setup](docs/development.md)
 - [Research sources](docs/sources.md)
 
@@ -45,3 +49,6 @@ Run the read-only prerequisite check from PowerShell:
 Downloaded references belong only in `.agents/docs/` (Git-ignored). Local BIOS
 dumps, tools, and emulator profiles belong in `.local/` (also Git-ignored).
 Never commit copyrighted BIOS images, music, or private device information.
+
+Copyright © 2026 Scott Ratchford. Tuna's original code is MIT-licensed; third-party
+components retain their respective licenses (see `LICENSES/` and `third_party/README.md`).

@@ -2,7 +2,7 @@
 
 ## Automated host coverage
 
-`Build.ps1 -Target Host` runs codec golden vectors, byte-order checks, metadata
+`make host` runs codec golden vectors, byte-order checks, metadata
 CRC/size checks, partial final blocks, exact replay, held-A debounce, paused
 sample retention, DATA and COMMIT retransmission, wrong sequences/offsets,
 overflow offsets, corrupt final payloads, early-transfer failure, malformed
@@ -15,7 +15,9 @@ checks deterministic scalar decode/conversion, complete-track fit rejection,
 complete 3/5-minute tracks with automatic profiles, an exact explicit 30-second
 excerpt, and truncated-input rejection. Run it with
 an actual FFmpeg executable. CI also runs GCC/Clang with address/undefined-behavior
-sanitizers and a Windows MSVC lane. CI results are separate from local results.
+sanitizers on Linux/macOS and a Windows MSYS2 GCC lane. CI results are separate
+from local results. The MIT C build helper also checks SHA-256 golden vectors
+and rejects incorrect GBA track/IRQ addresses and linked heap functions.
 
 ## Do not claim emulator/hardware acceptance from host tests
 
@@ -87,6 +89,11 @@ native Dolphin dialogs, controller input, audio capture or Connected toggles.
   libogc 3.1.0: all three targets cross-built. Production player: 9316 bytes;
   track 0x02010000..0x02040000 NOLOAD, audio boundary IRQ in IWRAM, no heap symbols.
 - GitHub host CI passed for GCC/Clang sanitizers and Windows MSVC.
+- Build portability follow-up: the root GNU Makefile now drives every target
+  without Python/PowerShell. Windows MSYS2 UCRT64 GCC 16.2 built/tested/packaged all
+  targets; 15 additional C build-tool checks passed, and every package digest
+  matched Windows' independent `Get-FileHash` implementation. CI now exercises
+  Make on Linux, macOS and Windows, using verified current action SHA pins.
 - Optional embedded-fixture standalone runtime harness compiled, but installed
   mGBA SDL 0.10.5 (`26b7884b`) did not expose port 2345. That runtime lane failed
   its prerequisite gate. No audio/counter/disconnect pass is asserted.
