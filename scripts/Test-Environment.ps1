@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$DevkitPro = 'D:\devkitPro',
+    [string]$DevkitPro,
     [string]$Dolphin,
     [string]$Mgba = 'C:\Program Files\mGBA\mGBA.exe',
     [string]$Bios
@@ -8,7 +8,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-if (-not $Dolphin) { $Dolphin = Join-Path $root '.local\tools\dolphin\Dolphin.exe' }
+if (-not $DevkitPro) {
+    foreach ($candidate in @($env:DEVKITPRO, "$root\.local\tools\msys64\opt\devkitpro", 'D:\devkitPro')) {
+        if ($candidate -and (Test-Path "$candidate\devkitARM")) { $DevkitPro = $candidate; break }
+    }
+    if (!$DevkitPro) { $DevkitPro = 'D:\devkitPro' }
+}
+if (-not $Dolphin) {
+    $Dolphin = Join-Path $root '.local\tools\dolphin\Dolphin.exe'
+    if (!(Test-Path $Dolphin) -and (Test-Path 'D:\Dolphin\Dolphin.exe')) { $Dolphin = 'D:\Dolphin\Dolphin.exe' }
+}
 if (-not $Bios) { $Bios = Join-Path $root '.local\bios\gba_bios.bin' }
 
 $checks = @(

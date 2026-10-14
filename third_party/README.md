@@ -10,3 +10,8 @@ The Xing/LAME gapless layout and 529-sample decoder-latency handling in
 MIT sender revision `615f39ae6674df1736ae8d92fa7f655fff65386e`.
 Its attribution/license is retained in `LICENSES/FIX94-MIT.txt`.
 No Dolphin or GPL Joybus tester implementation is copied.
+
+Tuna is based in part on the work of the devkitPro project, including unmodified
+libgba (LGPL with its static-linking exception) and libogc. Console packages
+include their installed license notices. Toolchain/runtime components retain
+their original licenses; the repository's MIT license applies to Tuna's own code.

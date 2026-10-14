@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+  <name>Tuna</name>
+  <coder>Tuna contributors</coder>
+  <version>0.1.0 / protocol 1</version>
+  <short_description>GBA RAM music sender</short_description>
+  <long_description>Browse FAT32 SD/USB music, preview adaptive compression, and boot a GBA over the GBA-GameCube cable. Port 2 by default. No cartridge required. Complete tracks up to five minutes fit using low-fidelity profiles; three-minute defaults use 2-bit ADPCM at 4096 Hz. No silent cropping. A legal GBA BIOS is required for emulator multiboot acceptance.</long_description>
+</app>

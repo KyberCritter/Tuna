@@ -1,0 +1,20 @@
+name: Host regression
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - run: make host CC=${{ matrix.compiler }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer'
+      - run: ./build/host/tuna-convert --jingle build/host/jingle.tuna
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: .\Build.ps1 -Target Host
+        shell: powershell
