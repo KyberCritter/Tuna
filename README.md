@@ -27,6 +27,7 @@ GBA BIOS and hardware/emulator acceptance runs are still required.
 
 Requires Visual Studio C++ tools and devkitPro gba-dev/gamecube-dev/wii-dev.
 Built Wii HBC files are in `dist/apps/tuna/`; GC DOL in `dist/tuna-gamecube.dol`.
+Tuna is based in part on the work of the devkitPro project (libgba/libogc).
 
 - [Application design](docs/design.md)
 - [Build, controls and conversion](docs/build.md)

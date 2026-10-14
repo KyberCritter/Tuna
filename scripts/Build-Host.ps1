@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$TestOnly)
+param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $build = Join-Path $root 'build\host'
@@ -17,5 +17,8 @@ foreach ($target in @('tests','tuna-convert')) {
     Push-Location $build
     try { & cmd.exe /d /s /c $line; if ($LASTEXITCODE) { throw "Compilation failed: $target" } } finally { Pop-Location }
 }
-& "$build\tests.exe"
-if ($LASTEXITCODE) { throw 'Unit tests failed.' }
+Push-Location $build
+try {
+    & "$build\tests.exe"
+    if ($LASTEXITCODE) { throw 'Unit tests failed.' }
+} finally { Pop-Location }

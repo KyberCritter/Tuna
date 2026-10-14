@@ -1,5 +1,13 @@
 # Executable local development plan (Windows)
 
+Implementation update: console sources, adaptive five-minute conversion, host
+tests and the single `Build.ps1` entry point now exist. Managed devkitPro tools
+were provisioned without admin changes under `.local/tools/msys64/opt/devkitpro`;
+all three cross-builds pass. Dolphin was found at `D:\Dolphin\Dolphin.exe`.
+The original observations below are retained as historical setup context.
+See [current execution evidence and open gates](validation.md); no BIOS/link/audio
+acceptance is implied by the successful builds.
+
 ## Observed machine, 2026-10-14
 
 - Windows x64, Ryzen 7 5800H, 16 logical processors, about 32 GiB RAM,
@@ -146,12 +154,12 @@ is a contingency with build cost, not a pre-existing stock Dolphin CLI feature.
 
 | Capability | Execution lane | Present status |
 | --- | --- | --- |
-| Decode/resample/encode and format validation | Host tests + GC/Wii DOL | Planned |
+| Decode/resample/encode and format validation | Host tests + GC/Wii DOL | Host + real MP3 fixtures passed; DOL runtime pending |
 | GBA title, A controls, FIFO/DMA playback | Standalone mGBA + integrated | Source-supported, untested |
 | Wii DOL, emulated SD MP3 input | Dolphin | Untested locally |
 | GC DOL, emulated SD Gecko MP3 input | Dolphin | Accepted initial target, untested |
 | No-cartridge Joybus multiboot | Dolphin integrated, user BIOS | BIOS/toolchain prerequisite |
-| Checksummed runtime transfer | GC/Wii DOL + integrated GBA | Not implemented |
+| Checksummed runtime transfer | GC/Wii DOL + integrated GBA | Implemented/cross-built; integrated run needs BIOS |
 | Cable removal retaining same RAM | Integrated Connected toggle | Verified in source, untested locally |
 | Playback after Wii process exits | mGBA state handoff / TCP | Version-dependent, unproven |
 | Physical unplug, battery and cable timing | Real Wii/GBA | Hardware-only acceptance |

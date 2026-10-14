@@ -3,6 +3,9 @@
 #include "display.h"
 #include "audio.h"
 #include <string.h>
+#ifdef TUNA_DIAGNOSTIC
+#include "diagnostic.h"
+#endif
 
 static uint8_t track[TUNA_CAPACITY] __attribute__((section(".track"), aligned(4)));
 static TunaReceiver receiver;
@@ -98,9 +101,15 @@ int main(void) {
     irqInit(); irqSet(IRQ_VBLANK, vblank); irqEnable(IRQ_VBLANK);
     display_init(); audio_init(); tuna_receiver_init(&receiver, track, sizeof(track));
     REG_RCNT = 0xc000; REG_JSTAT = 0; link_reset();
+#ifdef TUNA_DIAGNOSTIC
+    diagnostic_init(&receiver, track); player_loaded = receiver.state == TUNA_VERIFIED;
+#endif
     while (1) {
         int a;
         audio_service(); service_link();
+#ifdef TUNA_DIAGNOSTIC
+        diagnostic_service(frames);
+#endif
         a = !(REG_KEYINPUT & 1);
         if (a && !a_held && receiver.state == TUNA_VERIFIED) audio_key();
         a_held = a;

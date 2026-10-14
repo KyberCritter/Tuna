@@ -5,6 +5,10 @@ description: Build and test Tuna changes, record evidence, and checkpoint comple
 
 1. Read `docs/build.md`, `docs/validation.md`, and `git status --short` at the project root.
 2. Run `scripts/Verify.ps1` beside this skill. It invokes the repository build/test scripts and saves a report in ignored `artifacts/`.
+   For real MP3 fixtures run root `scripts/Test-Mp3.ps1` with a verified FFmpeg.
+   Root `scripts/Test-Gba.ps1` is a separate embedded-fixture/HLE/GDB lane; it is
+   currently blocked on the installed SDL build's missing GDB listener and must
+   never be reported as a multiboot, captured-audio or disconnect pass.
 3. For codec/protocol changes, add golden vectors, boundary/malformed-input tests,
    and idempotent retransmission tests in `tests/test.c`.
 4. For GBA audio changes, host tests are insufficient: preserve linker maps and run

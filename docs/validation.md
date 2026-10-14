@@ -75,3 +75,20 @@ package inventory, binary hashes, ROM-empty profile and SI port with every run.
 `scripts/Start-Dolphin.ps1` creates a fresh isolated profile and diagnostic manifest;
 it requires BIOS and built DOL rather than bypassing boot. It does not automate
 native Dolphin dialogs, controller input, audio capture or Connected toggles.
+
+## Local execution record (2026-10-14)
+
+- MSVC host regression: 15,463 checks passed, including a complete 300-second
+  low-rate track and exact sample-count replay. Codec tone SNR is diagnostic only.
+- FFmpeg 8.0.1 generated original mono/stereo and complete 180-/300-second MP3
+  fixtures. Conversion, gapless duration, selected profiles, 301-second rejection,
+  deterministic output, explicit excerpts and truncated-input rejection passed.
+- devkitARM r68 / GCC 16.1.0, devkitPPC r51 / GCC 16.2.0, libgba 0.5.4,
+  libogc 3.1.0: all three targets cross-built. Production player: 9316 bytes;
+  track 0x02010000..0x02040000 NOLOAD, audio boundary IRQ in IWRAM, no heap symbols.
+- GitHub host CI passed for GCC/Clang sanitizers and Windows MSVC.
+- Optional embedded-fixture standalone runtime harness compiled, but installed
+  mGBA SDL 0.10.5 (`26b7884b`) did not expose port 2345. That runtime lane failed
+  its prerequisite gate. No audio/counter/disconnect pass is asserted.
+- User BIOS is absent. Dolphin no-cartridge multiboot/runtime transfer and real
+  cable/audio/storage/listening-quality acceptance remain unexecuted.

@@ -71,7 +71,8 @@ the sender; native GC deployment requires an existing suitable loader, not HBC.
 Decoder input is bounded to 16 MiB, ID3v2 metadata to 1 MiB. Two decode passes use
 a fixed 4096-sample mono ring instead of allocating five minutes of PCM, so native
 GC memory remains bounded. First pass measures duration; second pass downsamples
-and encodes to the highest-quality profile that fits. Variable bitrate is supported;
+and encodes using a fixed profile preference, not an objective music-quality
+score. Variable bitrate is supported;
 rate changes, malformed frames, and truncated input are rejected. Stereo is
 downmixed in 32-bit arithmetic, then windowed-sinc low-pass filtered/resampled
 before block encoding. Valid Xing/LAME delay and padding metadata is honored;
@@ -91,3 +92,12 @@ Titles are bounded printable ASCII; non-ASCII filename bytes become `?`.
 
 The script preserves build logs and revision/status in ignored `artifacts/`.
 Unit tests are not substitutes for the acceptance gates in `docs/validation.md`.
+
+`scripts/Test-Gba.ps1` additionally builds a **separate, embedded-fixture diagnostic
+ROM** and attempts standalone mGBA/GDB counter tests. It is not in the production
+package and is never a substitute for no-cartridge BIOS multiboot. It uses isolated
+child configuration paths and dummy SDL audio/video drivers; it does not capture
+audible output. The installed mGBA 0.10.5 SDL build did not expose its GDB listener
+locally, so runtime acceptance for this optional lane remains blocked. Supply a
+verified compatible `-Mgba` executable to retry. The script fails rather than
+silently treating a missing listener as a pass.

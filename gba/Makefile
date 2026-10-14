@@ -9,8 +9,13 @@ CC := $(DEVKITARM)/bin/arm-none-eabi-gcc
 OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
 CFLAGS := -std=gnu11 -Os -g -Wall -Wextra -Werror -mcpu=arm7tdmi -mthumb -mthumb-interwork -ffunction-sections -fdata-sections -I$(ROOT)/include -I$(DEVKITPRO)/libgba/include
 SOURCES := main.c display.c audio.c ../shared/format.c ../shared/adpcm.c ../shared/protocol.c ../shared/player.c
+ifeq ($(DIAGNOSTIC),1)
+OUT := $(ROOT)/build/gba-diagnostic
+CFLAGS += -DTUNA_DIAGNOSTIC -I$(ROOT)/build/gba-fixture
+SOURCES += diagnostic.c ../build/gba-fixture/diagnostic_track.c
+endif
 OBJECTS := $(addprefix $(OUT)/,$(notdir $(SOURCES:.c=.o)))
-VPATH := .:../shared
+VPATH := .:../shared:../build/gba-fixture
 
 .PHONY: all
 all: $(OUT)/tuna.mb
