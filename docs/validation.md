@@ -219,9 +219,36 @@ Measured causes and changes:
 - Dolphin (Wii mode, tagged 60 s `mono.mp3`): the GBA displayed the title, artist,
   album, codec/rate, progress bar and controls, and A/R/L/B moved playback forward
   to the end, back to 0:00 and restarted. Evidence:
-  `artifacts/emulator-20261014-230958-c7c98eba/`. In that run the sender reported a
-  late DATA-phase link timeout at 122,624/130,560 bytes; this is recorded as an
-  emulator-link failure, not a pass, and the 130 KiB transfer is not claimed READY.
+  `artifacts/emulator-20261014-230958-c7c98eba/`. That first run also reproduced the
+  reported hardware glitch: the sender aborted with a link timeout at
+  122,624/130,560 bytes even though it was the final chunk handshake, not a lost
+  payload.
+
+## Last-chunk link timeout fix (2026-10-15 UTC)
+
+- Root cause: after the final payload bytes arrive, the sender sends COMMIT and waits
+  for READY. During that wait the GBA spends time validating the payload CRC and, on
+  the previous build, computing the whole-track output gain **before** it could answer.
+  `read_word` intended a 10 s budget for READY (`runtime == 2`), but it returned the
+  first 250 ms `status()` timeout instead of retrying, so any validation/load gap past
+  250 ms aborted the transfer even though the GBA held every byte.
+- Fix: `sender/link.c` now treats a transient status timeout as "GBA busy" and keeps
+  polling to the overall budget (1 s for DATA, 10 s for COMMIT); a real unplug only
+  surfaces when that budget expires. The GBA (`gba/main.c`) no longer blocks the link
+  with the output-gain scan: it defers `audio_load` until the READY reply has fully
+  drained, and gates `A` on `player_loaded`.
+- Reproduced and fixed under Dolphin, Wii mode, same tagged 60 s `mono.mp3`: the sender
+  now transfers all 130,560 payload bytes and reports `GBA verified CRC 1b48e04d:
+  READY. Safe to unplug.`; the GBA shows title/artist/album, `ADPCM2 8192HZ MONO`,
+  `130560/196448 B` and `SAFE TO UNPLUG`. Evidence:
+  `artifacts/emulator-20261014-234509-3f13f40b/` (selection, preview, transfer,
+  final GBA). The state-export context menu failed again, so no retained-byte
+  comparison is claimed.
+- Resident player is 11,688 bytes; host suite 76,886 checks, sender SI model 161,317,
+  build tool 15, all console targets build and the memory/heap/IWRAM gates pass. This
+  is emulator evidence for the link fix; it is not captured-audio or real-hardware
+  acceptance, and the long-transfer reliability on physical cable/BIOS still needs a
+  repeat.
 - Dolphin (GameCube mode, embedded 4 s jingle): BIOS boot, v2 transfer, READY and the
   new UI including `TUNA 0.1.3 MUSIC PLAYER`, progress fill, and the sender heading
   `TUNA 0.1.3 - native GameCube SD Gecko`. Evidence:

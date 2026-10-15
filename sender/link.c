@@ -37,10 +37,19 @@ static TunaError write_word(uint32_t word, int runtime) {
     tuna_put32(cmd + 1, word); return transfer(cmd, 5, 1);
 }
 static TunaError read_word(uint32_t *word, int runtime) {
-    uint8_t cmd = 0x14; TunaError e;
+    uint8_t cmd = 0x14; TunaError e = TUNA_OK;
     if (runtime) {
-        uint64_t start = gettime(); uint8_t s = 0;
-        do { e = status(&s); if (e) return e; if (s & TUNA_JOY_TRANSMIT) break; if (expired(start, runtime == 2 ? 10000 : 500)) return TUNA_TIMEOUT; usleep(100); } while (1);
+        uint64_t start = gettime(); uint8_t s = 0; unsigned budget = runtime == 2 ? 10000 : 1000;
+        do {
+            e = status(&s);
+            if (!e && (s & TUNA_JOY_TRANSMIT)) break;
+            /* Before it can answer, the GBA may spend longer than one 250 ms SI
+               poll validating a large payload or computing output gain. Treat a
+               transient timeout as "still busy" and keep polling to the overall
+               budget; a real unplug only surfaces when that budget expires. */
+            if (expired(start, budget)) return e ? e : TUNA_TIMEOUT;
+            usleep(100);
+        } while (1);
     }
     e = transfer(&cmd, 1, 5); if (!e) *word = tuna_u32(result); return e;
 }

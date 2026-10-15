@@ -19,7 +19,7 @@ static uint8_t request[TUNA_PACKET_MAX], reply[TUNA_PACKET_MAX];
 static unsigned rx_bytes, tx_bytes, tx_offset, target_bytes = 20;
 static volatile unsigned frames;
 static unsigned last_activity;
-static int player_loaded;
+static int player_loaded, load_pending;
 static char *number(char *out, uint32_t value, unsigned width) {
     char digits[10]; unsigned n = 0;
     do { digits[n++] = (char)('0' + value % 10); value /= 10; } while (value);
@@ -36,6 +36,13 @@ static void service_link(void) {
     if (REG_HS_CTRL & 1) { /* Host reset cannot invalidate a verified offline track. */
         link_reset();
         if (receiver.state == TUNA_RECEIVE) tuna_receiver_fail(&receiver, TUNA_IO);
+    }
+    /* Load only after the READY reply has fully drained. The output-gain scan
+       decodes the whole track, so doing it while the host waits for READY can
+       gap the link past the sender's SI timeout. */
+    if (load_pending && !player_loaded && !tx_bytes) {
+        audio_load(track + TUNA_HEADER, &receiver.track);
+        player_loaded = 1; load_pending = 0;
     }
     if (tx_bytes) {
         /* Do not overwrite a word until the host has read it. */
@@ -64,13 +71,11 @@ static void service_link(void) {
         if (rx_bytes == target_bytes) {
             TunaPacket packet;
             if (!tuna_packet_read(&packet, request, rx_bytes) && packet.type == TUNA_ABORT) {
-                audio_stop(); player_loaded = 0;
+                audio_stop(); player_loaded = 0; load_pending = 0;
             }
             tx_bytes = (unsigned)tuna_receiver_packet(&receiver, request, rx_bytes, reply);
             tx_offset = 0; rx_bytes = 0; target_bytes = 20;
-            if (receiver.state == TUNA_VERIFIED && !player_loaded) {
-                audio_load(track + TUNA_HEADER, &receiver.track); player_loaded = 1;
-            }
+            if (receiver.state == TUNA_VERIFIED && !player_loaded) load_pending = 1;
         }
     }
     if ((receiver.state == TUNA_RECEIVE || rx_bytes) && frames - last_activity > 180) {
@@ -145,7 +150,7 @@ int main(void) {
         l = !(REG_KEYINPUT & (1 << 9));
         r = !(REG_KEYINPUT & (1 << 8));
         b = !(REG_KEYINPUT & (1 << 1));
-        if (a && !a_held && receiver.state == TUNA_VERIFIED) audio_key();
+        if (a && !a_held && receiver.state == TUNA_VERIFIED && player_loaded) audio_key();
         if (receiver.state == TUNA_VERIFIED) {
             int32_t step = (int32_t)receiver.track.rate * SEEK_SECONDS;
             if (l) {
