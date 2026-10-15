@@ -8,7 +8,7 @@
    Do not hardcode a version anywhere else; see .opencode/AGENTS.md. */
 #define TUNA_VERSION_MAJOR 0
 #define TUNA_VERSION_MINOR 1
-#define TUNA_VERSION_PATCH 3
-#define TUNA_VERSION_STRING "0.1.3"
+#define TUNA_VERSION_PATCH 4
+#define TUNA_VERSION_STRING "0.1.4"
 
 #endif

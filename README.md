@@ -1,6 +1,6 @@
 # Tuna
 
-Current release: **v0.1.3** (version defined in `include/version.h`).
+Current release: **v0.1.4** (version defined in `include/version.h`).
 
 Tuna is a Wii homebrew application that sends MP3 files to a connected Game Boy Advance to play on the go.
 It compresses MP3 files stored on the Wii or a connected storage device into an executable program for the GBA.
