@@ -19,6 +19,8 @@ namespace TunaEmulator {
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h,StringBuilder s,int n);
   [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out Rect r);
+  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h,out Rect r);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h,IntPtr dc,uint flags);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
   [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")]

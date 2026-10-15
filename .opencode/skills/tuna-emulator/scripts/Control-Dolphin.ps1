@@ -18,15 +18,29 @@ function Resume-Tuna {
 }
 function Get-TunaGbaMenu {
     $gba=Get-TunaWindow $run 'GBA'
-    # Qt's keyboard-context (-1) path can disappear when this widget lacks focus.
-    # Target this owned widget explicitly, with a screen point inside its window.
-    (Get-TunaElement $gba.handle).SetFocus()
+    # A previous UIA menu action does not dismiss its Qt popup, so close any
+    # stale one first (otherwise it swallows the next context click).
+    foreach($stale in @(Get-TunaWindows $run | Where-Object { $_.title -eq 'dolphin-emu' })) {
+        [void][TunaEmulator.Native]::PostMessage([IntPtr]$stale.handle,0x10,[IntPtr]::Zero,[IntPtr]::Zero)
+    }
+    Start-Sleep -Milliseconds 150
+    # The integrated-GBA context menu is a Qt popup: it only opens for a
+    # foreground window in response to real mouse-button messages. Posting
+    # WM_CONTEXTMENU with screen coordinates spawns no menu on current Dolphin
+    # builds, so bring the window forward and post a right-click at its client
+    # centre instead.
+    [void][TunaEmulator.Native]::SetForegroundWindow([IntPtr]$gba.handle)
+    Start-Sleep -Milliseconds 200
     $rect=[TunaEmulator.Native+Rect]::new()
-    if(![TunaEmulator.Native]::GetWindowRect([IntPtr]$gba.handle,[ref]$rect)){throw 'Cannot locate the owned GBA window.'}
-    $x=[int](($rect.left+$rect.right)/2);$y=[int](($rect.top+$rect.bottom)/2)
+    if(![TunaEmulator.Native]::GetClientRect([IntPtr]$gba.handle,[ref]$rect)){throw 'Cannot measure the owned GBA window.'}
+    $x=[int](($rect.right-$rect.left)/2);$y=[int](($rect.bottom-$rect.top)/2)
     $point=[long](($x -band 65535) -bor (($y -band 65535) -shl 16))
     if($point -ge 2147483648){$point-=4294967296}
-    if(![TunaEmulator.Native]::PostMessage([IntPtr]$gba.handle,0x7b,[IntPtr]$gba.handle,[IntPtr]$point)){throw 'Could not request the owned GBA menu.'}
+    foreach($message in 0x0200,0x0204,0x0205) {
+        if($message -eq 0x0204){$wparam=[IntPtr]2}else{$wparam=[IntPtr]0}
+        if(![TunaEmulator.Native]::PostMessage([IntPtr]$gba.handle,$message,$wparam,[IntPtr]$point)){throw 'Could not request the owned GBA menu.'}
+        Start-Sleep -Milliseconds 50
+    }
     $deadline=[DateTime]::UtcNow.AddSeconds(5)
     do {
         $menus=@(Get-TunaWindows $run | Where-Object { $_.title -eq 'dolphin-emu' -or $_.kind -like '*Popup*' -or (!$_.title -and $_.kind -like 'Qt*') })
@@ -91,11 +105,11 @@ switch($Action) {
     $p=$element.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
     $on=$p.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
     if($on -ne $Connected){Invoke-TunaElement $element}
-    else {
-        # Dismiss only this owned popup, using WM_CLOSE (no global Escape).
-        foreach($w in @(Get-TunaWindows $run | Where-Object title -eq 'dolphin-emu')) {
-            [void][TunaEmulator.Native]::PostMessage([IntPtr]$w.handle,0x10,[IntPtr]::Zero,[IntPtr]::Zero)
-        }
+    # UIA Invoke does not dismiss the Qt popup, so close it explicitly after
+    # either branch; otherwise the next menu action finds a stale popup and
+    # fails. Dismiss only this owned popup, using WM_CLOSE (no global Escape).
+    foreach($w in @(Get-TunaWindows $run | Where-Object title -eq 'dolphin-emu')) {
+        [void][TunaEmulator.Native]::PostMessage([IntPtr]$w.handle,0x10,[IntPtr]::Zero,[IntPtr]::Zero)
     }
  }
  'ExportState' {
