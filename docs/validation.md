@@ -7,6 +7,11 @@ CRC/size checks, partial final blocks, exact replay, held-A debounce, paused
 sample retention, DATA and COMMIT retransmission, wrong sequences/offsets,
 overflow offsets, corrupt final payloads, early-transfer failure, malformed
 metadata, unavailable files and 10,000 deterministic malformed-packet cases.
+Storage tests cover validated cache publication/loading, source-content changes,
+separate excerpt keys, failed-transfer retention, corrupt/truncated cached files,
+and unavailable output directories. A separate host SI model executes production
+`sender/link.c` through boot-to-application handoff, CRC retransmission, replacement,
+malformed replies and failed DATA transfers; this model is not emulator evidence.
 FIR tests check DC preservation and suppression of a 12 kHz alias at 48 kHz input.
 The retained-RAM model completes replay without any receiver/link call.
 
@@ -99,3 +104,34 @@ native Dolphin dialogs, controller input, audio capture or Connected toggles.
   its prerequisite gate. No audio/counter/disconnect pass is asserted.
 - User BIOS is absent. Dolphin no-cartridge multiboot/runtime transfer and real
   cable/audio/storage/listening-quality acceptance remain unexecuted.
+
+## Transfer/cache follow-up (2026-10-14 local / 2026-10-15 UTC)
+
+- All console targets rebuilt; host format/storage suite passed 15,495 checks,
+  production sender SI-model suite passed 160,613 checks, and build-tool suite
+  passed 15 checks. FFmpeg MP3 regressions passed again. Resident player is 9332
+  bytes; the existing memory/heap/IWRAM IRQ gates pass.
+- A user-supplied BIOS matched the known GBA dump. Dolphin 2609a, isolated profiles,
+  port 2 integrated GBA and **empty GBA ROM paths** booted the production GameCube
+  sender/player and transferred the original jingle to READY (CRC `1089c2b8`).
+- The native Wii build read a generated four-second MP3 from an emulated FAT SD
+  image and saved its completed container under `sd:/tuna/` before confirmation.
+  An intentional wrong-port attempt timed out without READY. Retrying on port 2
+  reused sender RAM rather than converting again and reached READY (`b315346b`).
+- An exported integrated GBA state contained an exact match of all 16,992 track
+  bytes against the desktop converter output, SHA-256
+  `779ce28e87e6039a64108f4c814bfbafe3dcc854310ac05d318a3418a2a48450`.
+  After disabling Connected on the same GBA core, A played the retained track to
+  the displayed four-second end. No captured-audio, exact runtime sample counter,
+  underrun, pause/resume or two-play acceptance is claimed from this screen check.
+- The final rebuilt Wii binary reused the saved conversion after a cold app restart
+  against the same SD image, displayed the saved `/tuna/` file in its browser, and
+  waited for a separate A confirmation even when the preview-opening A was held.
+  The subsequent confirmed send reached READY. Dolphin instances were closed.
+- Evidence is ignored under `artifacts/dolphin-20261014-213745/` and
+  `artifacts/dolphin-cache-20261014-2200/`, with screenshots, BIOS/binary hashes and
+  retained-byte comparison. Final full-build evidence is
+  `artifacts/20261015T015235Z-4041/`; MP3 output is `artifacts/mp3-cache-followup.log`.
+  GC SD Gecko, real SD/USB/cable hardware, captured audio, disconnect during DATA/ACK,
+  and low-rate profile quality/performance gates remain open. The historical BIOS
+  absence above no longer blocks the locally tested BIOS/link lanes.

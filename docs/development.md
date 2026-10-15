@@ -7,6 +7,9 @@ all three cross-builds pass. Dolphin was found at `D:\Dolphin\Dolphin.exe`.
 The original observations below are retained as historical setup context.
 See [current execution evidence and open gates](validation.md); no BIOS/link/audio
 acceptance is implied by the successful builds.
+The transfer/cache follow-up in that record now includes measured cartridge-free
+GameCube/Wii integrated-GBA transfers and Wii emulated SD cache/retry checks.
+It does not close the audio timing, real hardware or GC SD Gecko acceptance gates.
 
 ## Observed machine, 2026-10-14
 

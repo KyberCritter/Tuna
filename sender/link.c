@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "link.h"
+#include "joybus.h"
 
 static unsigned channel = 1;
 static uint8_t command[32] ATTRIBUTE_ALIGN(32), result[32] ATTRIBUTE_ALIGN(32);
@@ -31,7 +32,7 @@ static TunaError write_word(uint32_t word, int runtime) {
     uint8_t cmd[5] = {0x15}; TunaError e;
     if (runtime) {
         uint64_t start = gettime(); uint8_t s = 0;
-        do { e = status(&s); if (e) return e; if (!(s & 2)) break; if (expired(start, 500)) return TUNA_TIMEOUT; usleep(100); } while (1);
+        do { e = status(&s); if (e) return e; if (!(s & TUNA_JOY_RECEIVE)) break; if (expired(start, 500)) return TUNA_TIMEOUT; usleep(100); } while (1);
     }
     tuna_put32(cmd + 1, word); return transfer(cmd, 5, 1);
 }
@@ -39,7 +40,7 @@ static TunaError read_word(uint32_t *word, int runtime) {
     uint8_t cmd = 0x14; TunaError e;
     if (runtime) {
         uint64_t start = gettime(); uint8_t s = 0;
-        do { e = status(&s); if (e) return e; if (s & 8) break; if (expired(start, runtime == 2 ? 10000 : 500)) return TUNA_TIMEOUT; usleep(100); } while (1);
+        do { e = status(&s); if (e) return e; if (s & TUNA_JOY_TRANSMIT) break; if (expired(start, runtime == 2 ? 10000 : 500)) return TUNA_TIMEOUT; usleep(100); } while (1);
     }
     e = transfer(&cmd, 1, 5); if (!e) *word = tuna_u32(result); return e;
 }
@@ -68,7 +69,17 @@ TunaError link_boot(const uint8_t *image, size_t length) {
     e = write_word(tuna_boot_encrypt(crc | (size << 16), offset, &key), 0); if (e) return e;
     e = read_word(&word, 0); if (e) return e;
     printf("BIOS reply %08lx; checking application HELLO next.\n", (unsigned long)word);
-    usleep(100000); return TUNA_OK;
+    /* Wait for main(), not a fixed delay. The BIOS and application share the
+       Joybus registers; a pending BIOS response is not a TNPK reply. */
+    start = gettime();
+    do {
+        e = status(&s); if (e) return e;
+        if (s & TUNA_JOY_APPLICATION) break;
+        if (expired(start, 10000)) return TUNA_TIMEOUT;
+        usleep(100);
+    } while (1);
+    if (s & TUNA_JOY_TRANSMIT) { e = read_word(&word, 0); if (e) return e; }
+    return TUNA_OK;
 }
 static TunaError exchange(uint8_t type, uint32_t seq, uint32_t offset, const void *body, uint16_t length, TunaPacket *reply, uint8_t *response) {
     uint8_t packet[TUNA_PACKET_MAX]; size_t n = tuna_packet_write(packet, type, seq, offset, body, length);
@@ -83,7 +94,10 @@ static TunaError exchange(uint8_t type, uint32_t seq, uint32_t offset, const voi
             uint32_t word; e = read_word(&word, type == TUNA_COMMIT ? 2 : 1); if (e) return e;
             tuna_put32(response + i, word);
             if (i == 16) {
-                if (memcmp(response, "TNPK", 4) || tuna_u16(response + 6) > TUNA_CHUNK) return TUNA_FORMAT;
+                if (memcmp(response, "TNPK", 4) || tuna_u16(response + 6) > TUNA_CHUNK) {
+                    printf("Invalid GBA reply during message %u: %02x %02x %02x %02x (expected TNPK).\n", type, response[0], response[1], response[2], response[3]);
+                    return TUNA_FORMAT;
+                }
                 target += tuna_u16(response + 6);
             }
         }

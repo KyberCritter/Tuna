@@ -15,7 +15,7 @@ After sending the song to the GBA, you can unplug the system and play your song 
 ## How It Works
 
 A Game Boy Advance only has 256 KiB of EWRAM (plus 32 KiB of IWRAM), which a connected device can directly write to.
-Tuna fills 9,316 bytes of this space with code for the music player.
+Tuna fills approximately 9 KiB of this space with code for the music player.
 The remaining space is reserved for the song, up to a 192 KiB track capacity.
 Because of the low storage constraint, the songs are compressed far, far below typical file sizes.
 If we instead connected a GBA with a custom game pack, we would be able to write to that storage.
@@ -55,12 +55,12 @@ The GameCube DOL is saved in `dist/tuna-gamecube.dol`.
 ### Run Tuna
 
 1. Copy the `apps/tuna/` folder from `dist/` onto a FAT32 SD card or USB device as `apps/tuna/`, so the files sit at `apps/tuna/boot.dol` (with `meta.xml` and `LICENSES/`).
-2. Create a `music` folder at the root of the same device and copy your MP3 (or `.tuna`) files into it. Tuna lists at most 127 files plus its embedded original jingle.
+2. Create a `music` folder at the root of the same device and copy your MP3 (or `.tuna`) files into it. Tuna searches both `/music/` and `/tuna/`, listing at most 127 files plus its embedded original jingle.
 3. Insert the storage device into the Wii, start the Homebrew Channel, and launch Tuna.
 4. Connect the GBA (powered on, no cartridge) to the Wii's **second** GameCube controller port with the GCN–GBA link cable. Control Tuna with a GameCube controller in Port 1 or use a Wii remote.
 5. (Optional) Use `X` on the GCN controller (or `+` on the Wii remote) to cycle the GBA cable between ports 2, 3, and 4.
 6. Use Up/Down to change the selected song.
-7. Press `A` to convert and preview a track (the preview shows the actual decoded duration and selected profile), then `A` again to send it to the GBA or `B` to cancel.
+7. Press `A` to convert and preview a track (the preview shows the actual decoded duration and selected profile), then `A` again to send it to the GBA or `B` to cancel. Completed MP3 conversions are saved as `.tuna` files in `/tuna/` on the **SD card**, before any GBA boot/transfer attempt—even when the MP3 is on USB.
 8. (Optional) Press `Y` (or `−`) to trim the song to no more than 30 seconds.
 9. (Optional) Cancel by pressing `B`.
 10. Wait until the GBA shows `SAFE TO UNPLUG` (the host also reports READY). You may unplug the cable or leave it connected.
@@ -77,6 +77,17 @@ Tuna is driven from the Wii while you choose and send a track; playback is contr
 
 Unplug the cable only after the GBA shows `SAFE TO UNPLUG` and the Wii reports `READY`.
 The track is stored in the GBA's RAM, so it disappears when the GBA is powered off or reset.
+
+### Retrying a failed transfer
+
+Select the same MP3 again: Tuna reuses its completed conversion instead of decoding
+it again. Saved conversions survive app restarts and appear in the browser after
+`B` rescans. Full tracks and explicit excerpts have separate cache files; changing
+the source content creates a new conversion. Old conversions are not deleted.
+If SD is missing, full or write-protected, Tuna warns and keeps the most recently
+prepared track in sender RAM for retry until another track is prepared or Tuna exits.
+No `READY` means the GBA transfer did not succeed; follow any reconnect/reset prompt
+and wait for both READY indications before unplugging.
 
 ## Acknowledgements
 

@@ -63,3 +63,11 @@ of link polling. Host transport failure must not imply READY.
 The application transport uses bounded stop-and-wait word transactions, checking
 Joybus receive/transmit status before register access. BIOS multiboot uses its
 separate key/cipher/CRC, not these runtime packets.
+
+JOYSTAT bit 1 (`0x02`) means GBA receive register full; bit 3 (`0x08`)
+means GBA transmit register full. These flags cannot be cleared by writing zero
+to JOYSTAT. On entry the player reads any remaining BIOS receive word before
+assembling packets, then sets general-purpose bit 5 (`0x20`) to announce application
+startup. After BIOS boot the sender waits for that bit and consumes any pending
+BIOS transmit word before sending HELLO. Runtime packets still require CAPS/READY
+validation; the startup bit is not proof of a transferred track.

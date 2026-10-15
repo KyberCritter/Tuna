@@ -57,7 +57,7 @@ Use a compatible GBA-GCN cable, powered GBA/GBA SP with no cartridge, and Wii
 RVL-001 ports or a GameCube. Controller on port 1, GBA on port 2 by default.
 X (Wii +) cycles cable ports 2..4. Do not use an ordinary multiplayer cable.
 
-Copy MP3 or `.tuna` files into FAT32 `/music` on Wii SD/USB or native-GC SD Gecko.
+Copy MP3 or `.tuna` files into FAT32 `/music/` or `/tuna/` on Wii SD/USB or native-GC SD Gecko.
 The shallow browser bounds paths to 511 bytes and lists at most 127 files plus
 an embedded original complete jingle. B rescans after device changes. Unsupported
 filesystems and storage devices are not promised. No internal optical/CD support.
@@ -69,6 +69,18 @@ with a three-minute default planning target. Y (Wii -) enables an explicit
 The preview shows actual decoded duration and requires another A to send/replace
 GBA RAM contents. B cancels. A replacement invalidates the old track before transfer.
 Port changes or link failures can require a no-cartridge GBA reset before boot.
+
+Completed MP3 conversions are saved to SD `/tuna/` **before** confirmation/boot/
+transfer, including MP3s read from USB. The directory is created automatically.
+Native GC uses its SD Gecko/default FAT mount. Cache filenames include source-path
+and source-content CRCs, conversion revision and excerpt duration (`0s` means full
+track), so full/excerpt modes and changed sources do not share a cache entry.
+Retries validate/reuse the saved container without another MP3 conversion; B rescans
+to list the saved files for direct selection. Cancelling or failing a transfer does
+not delete the conversion. Existing invalid cache files are left untouched with a
+warning. SD write failures warn but retain the most recent conversion in sender RAM
+until a different track is prepared or the app exits. Delete unwanted old `.tuna`
+files manually; interrupted `.tmp` files are not listed as tracks.
 
 Only unplug after GBA `SAFE TO UNPLUG` and host verified READY. GBA A plays,
 pauses (buffered fade-out, bounded latency), resumes, and restarts at end.

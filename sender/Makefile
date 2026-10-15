@@ -7,7 +7,7 @@ ROOT := $(abspath ..)
 OUT := $(ROOT)/build/$(PLATFORM)
 CC := $(DEVKITPPC)/bin/powerpc-eabi-gcc
 CFLAGS := -std=gnu11 -O2 -g -Wall -Wextra -Werror $(MACHDEP) -ffunction-sections -fdata-sections -I$(ROOT)/include -I$(ROOT)/build/generated -I$(LIBOGC_INC) -I$(ROOT)/third_party/minimp3
-SOURCES := main.c link.c ../host/convert.c ../shared/format.c ../shared/adpcm.c ../shared/protocol.c ../shared/player.c ../shared/resample.c ../shared/boot.c
+SOURCES := main.c link.c ../host/convert.c ../host/track_store.c ../shared/format.c ../shared/adpcm.c ../shared/protocol.c ../shared/player.c ../shared/resample.c ../shared/boot.c
 OBJECTS := $(addprefix $(OUT)/,$(notdir $(SOURCES:.c=.o))) $(OUT)/player_image.o
 VPATH := .:../host:../shared:../build/generated
 LIBS := -lfat -logc -lm

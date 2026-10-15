@@ -1,5 +1,7 @@
 #include "tuna.h"
 #include "convert.h"
+#include "track_store.h"
+#include "joybus.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -152,4 +154,37 @@ static void adaptive_profiles(void) {
     }
     free(track); free(pcm);
 }
-int main(void) { format_codec(); transfer_player(); resampler(); boundaries(); adaptive_profiles(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, malformed input)\n", checks); return 0; }
+static void track_storage(void) {
+    uint8_t *track, *loaded = NULL; size_t length, loaded_length; FILE *f;
+    char full[TUNA_PATH_MAX], again[TUNA_PATH_MAX], excerpt[TUNA_PATH_MAX], changed[TUNA_PATH_MAX];
+    char oversized[TUNA_PATH_MAX + 1];
+    CHECK(TUNA_JOY_RECEIVE == 2 && TUNA_JOY_TRANSMIT == 8 && TUNA_JOY_APPLICATION == 32);
+    f = fopen("cache-source-test.mp3", "wb"); CHECK(f != NULL);
+    CHECK(fwrite("source", 1, 6, f) == 6); CHECK(!fclose(f));
+    CHECK(tuna_cache_path(".", "cache-source-test.mp3", 0, full) == TUNA_OK);
+    CHECK(tuna_cache_path(".", "cache-source-test.mp3", 0, again) == TUNA_OK && !strcmp(full, again));
+    CHECK(tuna_cache_path(".", "cache-source-test.mp3", 30, excerpt) == TUNA_OK && strcmp(full, excerpt));
+    CHECK(tuna_cache_path(".", "cache-source-test.mp3", 301, changed) == TUNA_SIZE && !changed[0]);
+    memset(oversized, 'x', sizeof(oversized) - 1); oversized[sizeof(oversized) - 1] = 0;
+    CHECK(tuna_cache_path(oversized, "cache-source-test.mp3", 0, changed) == TUNA_SIZE && !changed[0]);
+    CHECK(tuna_make_jingle(&track, &length) == TUNA_OK);
+    CHECK(tuna_track_save(full, track, length) == TUNA_OK);
+    /* A failed transfer does not remove the published conversion. */
+    { TunaReceiver r; tuna_receiver_init(&r, storage, sizeof(storage));
+      transact(&r, TUNA_BEGIN, 0, 0, track, TUNA_HEADER); tuna_receiver_fail(&r, TUNA_TIMEOUT); }
+    CHECK(tuna_track_load(full, &loaded, &loaded_length) == TUNA_OK);
+    CHECK(length == loaded_length && !memcmp(track, loaded, length)); free(loaded);
+    CHECK(tuna_track_save(full, track, length) == TUNA_IO); /* No overwriting user files. */
+    track[0] ^= 1; CHECK(tuna_track_save(excerpt, track, length) == TUNA_FORMAT); track[0] ^= 1;
+    CHECK(tuna_track_load(excerpt, &loaded, &loaded_length) == TUNA_IO && !loaded && !loaded_length);
+    CHECK(tuna_track_save("__missing_cache_dir__/test.tuna", track, length) == TUNA_IO);
+    f = fopen("cache-source-test.mp3", "ab"); CHECK(f != NULL); CHECK(fputc('!', f) != EOF); CHECK(!fclose(f));
+    CHECK(tuna_cache_path(".", "cache-source-test.mp3", 0, changed) == TUNA_OK && strcmp(full, changed));
+    f = fopen(full, "wb"); CHECK(f != NULL); CHECK(fwrite(track, 1, 12, f) == 12); CHECK(!fclose(f));
+    CHECK(tuna_track_load(full, &loaded, &loaded_length) == TUNA_SIZE && !loaded && !loaded_length);
+    f = fopen(full, "wb"); CHECK(f != NULL); track[length - 1] ^= 1;
+    CHECK(fwrite(track, 1, length, f) == length); CHECK(!fclose(f));
+    CHECK(tuna_track_load(full, &loaded, &loaded_length) == TUNA_CRC && !loaded && !loaded_length);
+    CHECK(!remove(full)); CHECK(!remove("cache-source-test.mp3")); free(track);
+}
+int main(void) { format_codec(); transfer_player(); resampler(); boundaries(); adaptive_profiles(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, storage, malformed input)\n", checks); return 0; }

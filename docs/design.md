@@ -39,7 +39,9 @@ Wii pipeline: filesystem source -> MP3 decode -> stereo downmix -> anti-aliased
 resampling -> encode -> size/quality preview -> multiboot -> runtime transfer.
 Use a portable scalar MP3 decoder on Wii, not GBA. Bound allocations, metadata,
 duration, and decoder work; handle malformed files and unavailable storage.
-Cache converted tracks on Wii storage optionally, not on GBA cartridge storage.
+Save completed converted tracks to SD `/tuna/` before transfer, not on GBA cartridge
+storage. Reuse validated containers on retries; retain the last prepared container
+in sender RAM if SD writes fail. Browse `/music/` and `/tuna/`.
 
 GBA pipeline: receive compressed track into reserved EWRAM -> verify -> decode
 incrementally -> signed 8-bit PCM double buffer -> timer/DMA Direct Sound FIFO A,

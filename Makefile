@@ -13,9 +13,10 @@ EXEEXT := .exe
 endif
 INCLUDES := -Iinclude -Ithird_party/minimp3
 SHARED := $(wildcard shared/*.c)
-HOST := $(SHARED) host/convert.c
+HOST := $(SHARED) host/convert.c host/track_store.c
 HEADERS := $(wildcard include/*.h) third_party/minimp3/minimp3.h
 HOST_TEST := build/host/tests$(EXEEXT)
+LINK_TEST := build/host/link-tests$(EXEEXT)
 CONVERTER := build/host/tuna-convert$(EXEEXT)
 BUILD_TOOL := build/host/tuna-build$(EXEEXT)
 ARM_NM := $(DEVKITARM)/bin/arm-none-eabi-nm
@@ -36,12 +37,14 @@ $(HOST_TEST): $(HOST) tests/test.c $(HEADERS) Makefile | build/host
 	$(CC) $(CFLAGS) $(INCLUDES) $(HOST) tests/test.c -lm -o $@
 $(CONVERTER): $(HOST) host/main.c $(HEADERS) Makefile | build/host
 	$(CC) $(CFLAGS) $(INCLUDES) $(HOST) host/main.c -lm -o $@
+$(LINK_TEST): $(HOST) sender/link.c sender/link.h tests/link_test.c tests/stubs/gccore.h tests/stubs/ogc/lwp_watchdog.h $(HEADERS) Makefile | build/host
+	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -Itests/stubs -Isender $(INCLUDES) $(HOST) sender/link.c tests/link_test.c -lm -o $@
 $(BUILD_TOOL): tools/build_tool.c tools/sha256.c tools/sha256.h Makefile | build/host
 	$(CC) $(CFLAGS) -Itools tools/build_tool.c tools/sha256.c -o $@
 build/host/jingle.tuna: $(CONVERTER)
 	./$(CONVERTER) --jingle $@
-test: $(HOST_TEST) $(BUILD_TOOL)
-	cd build/host && ./tests$(EXEEXT) && ./tuna-build$(EXEEXT) selftest
+test: $(HOST_TEST) $(LINK_TEST) $(BUILD_TOOL)
+	cd build/host && ./tests$(EXEEXT) && ./link-tests$(EXEEXT) && ./tuna-build$(EXEEXT) selftest
 
 gba: host
 	+$(MAKE) -C gba

@@ -2,6 +2,7 @@
 #include "tuna.h"
 #include "display.h"
 #include "audio.h"
+#include "joybus.h"
 #include <string.h>
 #ifdef TUNA_DIAGNOSTIC
 #include "diagnostic.h"
@@ -32,7 +33,8 @@ static void service_link(void) {
         if (receiver.state == TUNA_RECEIVE) tuna_receiver_fail(&receiver, TUNA_IO);
     }
     if (tx_bytes) {
-        if (!(REG_JSTAT & 8)) {
+        /* Do not overwrite a word until the host has read it. */
+        if (!(REG_JSTAT & TUNA_JOY_TRANSMIT)) {
             if (tx_offset < tx_bytes) {
                 uint8_t word[4] = {0}; unsigned n = tx_bytes - tx_offset > 4 ? 4 : tx_bytes - tx_offset;
                 memcpy(word, reply + tx_offset, n); REG_JOYTR = tuna_u32(word); tx_offset += n;
@@ -45,7 +47,7 @@ static void service_link(void) {
         }
         return;
     }
-    if (REG_JSTAT & 2) {
+    if (REG_JSTAT & TUNA_JOY_RECEIVE) {
         uint32_t word = REG_JOYRE; unsigned i;
         for (i = 0; i < 4 && rx_bytes < target_bytes; ++i) request[rx_bytes++] = (uint8_t)(word >> (i * 8));
         last_activity = frames;
@@ -100,7 +102,11 @@ int main(void) {
     unsigned drawn = UINT32_MAX; int a_held = 0;
     irqInit(); irqSet(IRQ_VBLANK, vblank); irqEnable(IRQ_VBLANK);
     display_init(); audio_init(); tuna_receiver_init(&receiver, track, sizeof(track));
-    REG_RCNT = 0xc000; REG_JSTAT = 0; link_reset();
+    REG_RCNT = 0xc000;
+    /* JOYSTAT's receive/transmit flags are read-only. Writing zero does not
+       clear the last BIOS multiboot word: consume it before framing TNPK. */
+    if (REG_JSTAT & TUNA_JOY_RECEIVE) { volatile uint32_t discarded = REG_JOYRE; (void)discarded; }
+    link_reset(); REG_JSTAT = TUNA_JOY_APPLICATION;
 #ifdef TUNA_DIAGNOSTIC
     diagnostic_init(&receiver, track); player_loaded = receiver.state == TUNA_VERIFIED;
 #endif
