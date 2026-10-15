@@ -19,10 +19,12 @@ HOST_TEST := build/host/tests$(EXEEXT)
 CONVERTER := build/host/tuna-convert$(EXEEXT)
 BUILD_TOOL := build/host/tuna-build$(EXEEXT)
 ARM_NM := $(DEVKITARM)/bin/arm-none-eabi-nm
-LICENSE_FILES := $(patsubst %,LICENSES/%,$(notdir $(wildcard LICENSES/*)))
-DIST_FILES := tuna.mb tuna-convert$(EXEEXT) jingle.tuna README.md LICENSE \
-	$(LICENSE_FILES) LICENSES/minimp3-CC0.txt LICENSES/libgba.txt LICENSES/libogc.txt \
-	tuna-gamecube.dol apps/tuna/boot.dol apps/tuna/meta.xml
+LICENSE_FILES := $(wildcard LICENSES/*)
+LEGAL_FILES := LICENSE THIRD-PARTY-NOTICES.md $(LICENSE_FILES) \
+	LICENSES/minimp3-CC0.txt LICENSES/libgba.txt LICENSES/libogc.txt
+DIST_FILES := tuna.mb tuna-convert$(EXEEXT) jingle.tuna README.md $(LEGAL_FILES) \
+	tuna-gamecube.dol apps/tuna/boot.dol apps/tuna/meta.xml \
+	$(addprefix apps/tuna/,$(LEGAL_FILES))
 
 .PHONY: all host test gba embed gamecube wii package
 all: package
@@ -54,12 +56,14 @@ wii: embed
 	+$(MAKE) -C sender PLATFORM=wii
 
 package: host gamecube wii
-	mkdir -p dist/apps/tuna dist/LICENSES
-	cp build/gba/tuna.mb $(CONVERTER) build/host/jingle.tuna README.md LICENSE dist/
-	cp -R LICENSES/. dist/LICENSES/
+	mkdir -p dist/apps/tuna/LICENSES dist/LICENSES
+	cp build/gba/tuna.mb $(CONVERTER) build/host/jingle.tuna README.md LICENSE THIRD-PARTY-NOTICES.md dist/
+	cp $(LICENSE_FILES) dist/LICENSES/
 	cp third_party/minimp3/LICENSE dist/LICENSES/minimp3-CC0.txt
 	cp $(DEVKITPRO)/libgba/libgba_license.txt dist/LICENSES/libgba.txt
 	cp $(DEVKITPRO)/libogc/LICENSE dist/LICENSES/libogc.txt
+	cp dist/LICENSE dist/THIRD-PARTY-NOTICES.md dist/apps/tuna/
+	cp $(addprefix dist/,$(filter LICENSES/%,$(LEGAL_FILES))) dist/apps/tuna/LICENSES/
 	cp build/gamecube/tuna.dol dist/tuna-gamecube.dol
 	cp build/wii/tuna.dol dist/apps/tuna/boot.dol
 	cp assets/meta.xml dist/apps/tuna/meta.xml

@@ -56,4 +56,7 @@ Tuna is based in part on the work of the devkitPro project (libgba/libogc).
 ## License
 
 Copyright © 2026 Scott Ratchford. Tuna's original code is MIT-licensed; third-party
-components retain their respective licenses (see `LICENSES/` and `third_party/README.md`).
+components retain their respective licenses. The distributed executables are not
+exclusively MIT-licensed. See [third-party notices](THIRD-PARTY-NOTICES.md),
+`LICENSES/`, and `third_party/README.md`. Keep these notices with redistributed
+binaries, including the Wii Homebrew Channel app folder.

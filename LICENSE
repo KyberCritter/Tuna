@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Scope of this license
+---------------------
+The MIT license above applies to Tuna's original code and documentation.
+Third-party code, linked libraries, startup code, and runtime components retain
+their own copyrights and licenses. They are not relicensed under MIT by this
+file. See THIRD-PARTY-NOTICES.md and LICENSES/ for notices, license texts,
+linking exceptions, and source-availability information.
