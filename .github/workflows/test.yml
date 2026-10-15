@@ -15,7 +15,6 @@ jobs:
           - os: macos-latest
             compiler: clang
     steps:
-      # Release and tag commit verified against GitHub on 2026-10-14.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: make host CC=${{ matrix.compiler }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer'
   windows:
