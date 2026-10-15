@@ -16,6 +16,8 @@ description: Build and test Tuna changes, record evidence, and checkpoint comple
 4. For GBA audio changes, host tests are insufficient: preserve linker maps and run
    the standalone/integrated emulator acceptance checklist. Never assert READY,
    disconnect, audible output, or cartridge-free multiboot based on a mock alone.
+   Use `tuna-emulator` for the concrete local Windows Dolphin procedure, scripts,
+   process-owned TAS/screenshot/state handling and mandatory single-instance cleanup.
 5. Commit only the intended source changes after tests pass. Push only when the
    user authorized it (the original project implementation request did).
 6. Do not commit generated media, tools, BIOS, emulator profiles or evidence.
