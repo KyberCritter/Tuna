@@ -6,6 +6,8 @@ Tuna is a Wii homebrew application that sends MP3 files to a connected Game Boy 
 It compresses MP3 files stored on the Wii or a connected storage device into an executable program for the GBA.
 After sending the song to the GBA, you can unplug the system and play your song anywhere!
 
+![Tuna's GBA player showing a sent track, paused and safe to unplug](docs/images/gba-player.png)
+
 ## Supported Hardware
 
 - Wii RVL-001 (has GameCube ports, must be softmodded)
@@ -59,14 +61,26 @@ The GameCube DOL is saved in `dist/tuna-gamecube.dol`.
 1. Copy the `apps/tuna/` folder from `dist/` onto a FAT32 SD card or USB device as `apps/tuna/`, so the files sit at `apps/tuna/boot.dol` (with `meta.xml` and `LICENSES/`).
 2. Create a `music` folder at the root of the same device and copy your MP3 (or `.tuna`) files into it. Tuna searches both `/music/` and `/tuna/`, listing at most 127 files plus its embedded original jingle.
 3. Insert the storage device into the Wii, start the Homebrew Channel, and launch Tuna.
+
+    ![Tuna's Wii browser listing a track found on the storage device](docs/images/wii-startup.png)
+
 4. Connect the GBA (powered on, no cartridge) to the Wii's **second** GameCube controller port with the GCN–GBA link cable. Control Tuna with a GameCube controller in Port 1 or use a Wii remote.
 5. (Optional) Use `X` on the GCN controller (or `+` on the Wii remote) to cycle the GBA cable between ports 2, 3, and 4.
 6. Use Up/Down to change the selected song.
 7. Press `A` to convert and preview a track (the preview shows the actual decoded duration and selected profile), then `A` again to send it to the GBA or `B` to cancel. Completed MP3 conversions are saved as `.tuna` files in `/tuna/` on the **SD card**, before any GBA boot/transfer attempt—even when the MP3 is on USB.
+
+    ![Tuna's conversion preview showing the decoded duration and chosen profile](docs/images/wii-preview.png)
+
 8. (Optional) Press `Y` (or `−`) to trim the song to no more than 30 seconds.
 9. (Optional) Cancel by pressing `B`.
+
+    ![The GBA waiting for a track before the transfer completes](docs/images/gba-startup.png)
+
 10. Wait until the GBA shows `SAFE TO UNPLUG` (the host also reports READY). You may unplug the cable or leave it connected.
 11. Press `A` on the GBA to play or pause a track. At the end of a track, press `A` to restart.
+
+    ![Tuna's GBA player playing the transferred track](docs/images/gba-playing.png)
+
 12. Press `L`/`R` to seek five seconds back/forward (hold to repeat) and `B` to return to the start. The screen shows the title, artist, album, codec, sample rate and progress.
 13. The track lives in GBA RAM only, so it disappears when the GBA is powered off or reset. Press Start (or Home) to exit Tuna.
 
