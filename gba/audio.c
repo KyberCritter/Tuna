@@ -89,6 +89,35 @@ void audio_key(void) {
     if (!buffers[0].ready) return;
     start_buffer(0); REG_TM0CNT_L = (unsigned short)(0u - timer_reload); audio_active = 1; REG_TM0CNT_H = TIMER_START;
 }
+/* Move the cursor and re-prime. resume != 0 keeps playing from the new point
+   with a fade-in so a seek is click-free; otherwise the new point stays paused. */
+static void seek_to(uint32_t target, int resume) {
+    if (target > decoder.samples) target = decoder.samples;
+    audio_stop();
+    tuna_player_seek(&decoder, target);
+    audio_played = target; pause_pending = 0; current = 0;
+    buffers[0].ready = buffers[1].ready = 0;
+    if (resume && target < decoder.samples) {
+        decoder.state = TUNA_PLAYING; stopped_for_pause = 0;
+        fill(0, 1); fill(1, 0);
+        if (!buffers[0].ready) return;
+        start_buffer(0); REG_TM0CNT_L = (unsigned short)(0u - timer_reload); audio_active = 1; REG_TM0CNT_H = TIMER_START;
+    } else {
+        decoder.state = target < decoder.samples ? TUNA_PAUSED : TUNA_ENDED;
+        stopped_for_pause = target < decoder.samples;
+    }
+}
+void audio_seek(int32_t delta) {
+    int32_t target;
+    if (audio_underruns) return;
+    target = (int32_t)audio_played + delta;
+    if (target < 0) target = 0;
+    seek_to((uint32_t)target, audio_active);
+}
+void audio_restart(void) {
+    if (audio_underruns) return;
+    seek_to(0, audio_active);
+}
 void audio_service(void) {
     unsigned slot;
     if (!audio_active) return;

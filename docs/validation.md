@@ -3,7 +3,8 @@
 ## Automated host coverage
 
 `make host` runs codec golden vectors, byte-order checks, metadata
-CRC/size checks, partial final blocks, exact replay, held-A debounce, paused
+CRC/size checks, title/artist/album framing, ID3v1/ID3v2 extraction, sample-accurate
+seek, partial final blocks, exact replay, held-A debounce, paused
 sample retention, DATA and COMMIT retransmission, wrong sequences/offsets,
 overflow offsets, corrupt final payloads, early-transfer failure, malformed
 metadata, unavailable files and 10,000 deterministic malformed-packet cases.
@@ -37,10 +38,12 @@ configuration and disconnect rules in `docs/development.md`.
    profile, port 2 GBA Integrated, ROM path **empty**, port 1 controller.
 4. Boot the GC DOL, select original jingle, verify BIOS boot, HELLO/CAPS and GBA
    READY. Record host CRC and exact GBA retained container bytes.
-5. Capture GBA output audio and screen. Verify two complete plays, title, pause /
-   resume, exact final sample count, zero underruns, no boundary clicks, and no
-   DMA out-of-range reads. Check the timer-IRQ FIFO reset/reprime deadline in
-   particular: software simulation does not prove its hardware timing.
+5. Capture GBA output audio and screen. Verify two complete plays, title and the
+   artist/album (tagged fixture), codec/rate, progress bar, pause / resume, L/R
+   seek and B restart landing on the expected time, exact final sample count, zero
+   underruns, no boundary/seek clicks, and no DMA out-of-range reads. Check the
+   timer-IRQ FIFO reset/reprime deadline in particular: software simulation does
+   not prove its hardware timing.
 6. Toggle **Connected** off without deleting/resetting the integrated GBA core.
    Repeat A controls and replay on the same RAM. Disconnect during DATA and during
    ACK; require a timeout/error, never READY or playback of incomplete bytes.
@@ -55,14 +58,14 @@ configuration and disconnect rules in `docs/development.md`.
 ## Codec feasibility gate
 
 The short-track profile is mono IMA ADPCM at 8192 Hz. Fixed block framing
-and the 96-byte header leave 1488 blocks: **46.5 seconds maximum for that profile**. A 4-second
-original jingle fits at 16,992 bytes. A 30-second explicit excerpt uses 126,816
+and the 160-byte header leave 1488 blocks: **46.5 seconds maximum for that profile**. A 4-second
+original jingle fits at 17,056 bytes. A 30-second explicit excerpt uses 126,880
 bytes. No commercial music or BIOS is included.
 
 Three-minute music needs approximately 8.74 kbit/s or less, including overhead;
 four minutes needs approximately 6.55 kbit/s. This profile is about 33.8 kbit/s.
-Automatic custom 2-bit ADPCM/4096 Hz fits a complete three-minute track in 195,936
-bytes. Adaptive 1-bit delta/4096 Hz fits five minutes in 172,896 bytes. Host tests
+Automatic custom 2-bit ADPCM/4096 Hz fits a complete three-minute track in a
+196,000-byte container. Adaptive 1-bit delta/4096 Hz fits five minutes in 172,960 bytes. Host tests
 validate encoded fit, exact replay and complete MP3 conversion, including encoder
 delay/padding. The typical three-minute planning target is now required; a short
 jingle alone is insufficient. These profiles sacrifice bandwidth and fidelity.
@@ -194,3 +197,37 @@ Measured causes and changes:
   whether the residual discontinuity is Dolphin's resampler or the codec's 256-sample
   block seams. The automatic gain also changes relative loudness between tracks, which
   is a deliberate trade-off for audibility on the GBA's Direct Sound output.
+
+## Seek, metadata and release versioning follow-up (2026-10-15 UTC)
+
+- GBA playback now seeks: `L`/`R` step five seconds backward/forward (hold repeats)
+  and `B` returns to 0:00. Blocks are independent, so seeking only moves the decode
+  cursor and re-primes the existing double buffer; there is no keyframe table or
+  extra buffer. Host tests prove sample-accurate seeks (mid-block, clamped-forward,
+  backward-from-end, replay-from-zero) against a full reference decode.
+- The container gained artist/album (format revision 2, 160-byte header), extracted
+  from ID3v2 `TIT2`/`TPE1`/`TALB` with an ID3v1 fallback. The GBA screen shows
+  title/artist/album (artist/album only when tagged), codec, sample rate, encoded
+  size, a progress bar, and elapsed/total time, with an inverted two-colour header
+  and footer bar. The release version is `0.1.3` from `include/version.h` and is
+  shown on the GBA header, the sender heading, and HBC `meta.xml`.
+- Host suite: 76,886 checks; sender SI model: 161,317; build tool: 15. All three
+  console targets build; resident player is 11,640 bytes (well under the 64 KiB
+  gateway). A 60-second tagged MP3 extracted `title='Seek Test Song'`,
+  `artist='Tuna Artist'`, `album='Tuna Album'` into a 130,720-byte format-revision-2
+  container.
+- Dolphin (Wii mode, tagged 60 s `mono.mp3`): the GBA displayed the title, artist,
+  album, codec/rate, progress bar and controls, and A/R/L/B moved playback forward
+  to the end, back to 0:00 and restarted. Evidence:
+  `artifacts/emulator-20261014-230958-c7c98eba/`. In that run the sender reported a
+  late DATA-phase link timeout at 122,624/130,560 bytes; this is recorded as an
+  emulator-link failure, not a pass, and the 130 KiB transfer is not claimed READY.
+- Dolphin (GameCube mode, embedded 4 s jingle): BIOS boot, v2 transfer, READY and the
+  new UI including `TUNA 0.1.3 MUSIC PLAYER`, progress fill, and the sender heading
+  `TUNA 0.1.3 - native GameCube SD Gecko`. Evidence:
+  `artifacts/emulator-20261014-230821-1f67e790/` (READY screenshots) and
+  `artifacts/emulator-20261014-231602-e9697f11/` (version + playing). The state-export
+  context menu failed in both attempts, so no new retained-byte comparison is claimed.
+- Still open: captured audible output on hardware, real-cable/long-transfer
+  reliability, and the low-rate quality/performance gates. No audio or hardware
+  acceptance is claimed here.

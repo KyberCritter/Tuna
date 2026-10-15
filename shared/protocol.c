@@ -5,7 +5,7 @@
 size_t tuna_packet_write(uint8_t *out, uint8_t type, uint32_t seq, uint32_t offset, const void *body, uint16_t length) {
     uint32_t crc;
     if (length > TUNA_CHUNK || (length && !body)) return 0;
-    memcpy(out, "TNPK", 4); out[4] = TUNA_VERSION; out[5] = type;
+    memcpy(out, "TNPK", 4); out[4] = TUNA_FORMAT_VERSION; out[5] = type;
     tuna_put16(out + 6, length); tuna_put32(out + 8, seq); tuna_put32(out + 12, offset);
     if (length) memcpy(out + 20, body, length);
     crc = tuna_crc_update(UINT32_MAX, out, 16);
@@ -14,7 +14,7 @@ size_t tuna_packet_write(uint8_t *out, uint8_t type, uint32_t seq, uint32_t offs
 }
 TunaError tuna_packet_read(TunaPacket *p, const uint8_t *data, size_t n) {
     uint32_t c;
-    if (n < 20 || memcmp(data, "TNPK", 4) || data[4] != TUNA_VERSION) return TUNA_FORMAT;
+    if (n < 20 || memcmp(data, "TNPK", 4) || data[4] != TUNA_FORMAT_VERSION) return TUNA_FORMAT;
     p->length = tuna_u16(data + 6);
     if (p->length > TUNA_CHUNK || n != 20u + p->length) return TUNA_SIZE;
     c = tuna_crc_update(UINT32_MAX, data, 16);

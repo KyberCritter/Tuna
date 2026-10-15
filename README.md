@@ -1,5 +1,7 @@
 # Tuna
 
+Current release: **v0.1.3** (version defined in `include/version.h`).
+
 Tuna is a Wii homebrew application that sends MP3 files to a connected Game Boy Advance to play on the go.
 It compresses MP3 files stored on the Wii or a connected storage device into an executable program for the GBA.
 After sending the song to the GBA, you can unplug the system and play your song anywhere!
@@ -15,7 +17,7 @@ After sending the song to the GBA, you can unplug the system and play your song 
 ## How It Works
 
 A Game Boy Advance only has 256 KiB of EWRAM (plus 32 KiB of IWRAM), which a connected device can directly write to.
-Tuna fills approximately 9 KiB of this space with code for the music player.
+Tuna fills approximately 12 KiB of this space with code for the music player.
 The remaining space is reserved for the song, up to a 192 KiB track capacity.
 Because of the low storage constraint, the songs are compressed far, far below typical file sizes.
 If we instead connected a GBA with a custom game pack, we would be able to write to that storage.
@@ -65,7 +67,8 @@ The GameCube DOL is saved in `dist/tuna-gamecube.dol`.
 9. (Optional) Cancel by pressing `B`.
 10. Wait until the GBA shows `SAFE TO UNPLUG` (the host also reports READY). You may unplug the cable or leave it connected.
 11. Press `A` on the GBA to play or pause a track. At the end of a track, press `A` to restart.
-12. The track lives in GBA RAM only, so it disappears when the GBA is powered off or reset. Press Start (or Home) to exit Tuna.
+12. Press `L`/`R` to seek five seconds back/forward (hold to repeat) and `B` to return to the start. The screen shows the title, artist, album, codec, sample rate and progress.
+13. The track lives in GBA RAM only, so it disappears when the GBA is powered off or reset. Press Start (or Home) to exit Tuna.
 
 ## Controls
 
@@ -73,7 +76,7 @@ Tuna is driven from the Wii while you choose and send a track; playback is contr
 
 - **Wii Remote:** `A` opens the conversion preview and sends, `B` cancels a preview or rescans storage, Up/Down browse the list, `+` cycles the GBA cable port (2–4, port 2 by default), `−` toggles the explicit 30-second excerpt, and Home exits Tuna.
 - **GameCube controller (port 1):** `A` opens the conversion preview and sends, `B` cancels a preview or rescans, Up/Down browse, `X` cycles the GBA cable port, `Y` toggles the excerpt, and Start exits.
-- **GBA:** `A` plays, pauses, resumes, and restarts a track after it ends.
+- **GBA:** `A` plays, pauses, resumes, and restarts a track after it ends; `L`/`R` seek five seconds back/forward (hold to repeat); `B` returns to 0:00.
 
 Unplug the cable only after the GBA shows `SAFE TO UNPLUG` and the Wii reports `READY`.
 The track is stored in the GBA's RAM, so it disappears when the GBA is powered off or reset.

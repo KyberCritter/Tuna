@@ -44,42 +44,58 @@ static uint32_t header_crc(const uint8_t *p) {
     const uint8_t zero[4] = {0};
     uint32_t c = tuna_crc_update(UINT32_MAX, p, 28);
     c = tuna_crc_update(c, zero, 4);
-    return ~tuna_crc_update(c, p + 32, 64);
+    return ~tuna_crc_update(c, p + 32, TUNA_HEADER - 32);
+}
+/* Bounded length of a NUL-terminated metadata string (no read past limit). */
+static unsigned text_length(const char *s, unsigned limit) {
+    unsigned n = 0;
+    while (n < limit && s[n]) ++n;
+    return n;
+}
+/* Copy a bounded printable-ASCII field; rejects non-printable or nonzero padding. */
+static int read_text(char *dst, const uint8_t *src, unsigned len, unsigned limit) {
+    unsigned i;
+    for (i = 0; i < limit; ++i) {
+        if (i < len) { if (src[i] < 32 || src[i] > 126) return 1; dst[i] = (char)src[i]; }
+        else if (src[i]) return 1;
+    }
+    dst[limit] = 0; return 0;
 }
 TunaError tuna_header_write(uint8_t out[TUNA_HEADER], const TunaTrack *t) {
-    size_t len = 0; uint8_t codec = t->codec ? t->codec : TUNA_IMA4; uint32_t rate = t->rate ? t->rate : TUNA_RATE;
-    while (len <= TUNA_TITLE && t->title[len]) ++len;
-    if (len > TUNA_TITLE || !t->samples || !tuna_profile_block(codec) || t->bytes != tuna_profile_size(t->samples, codec) ||
+    unsigned tlen = text_length(t->title, TUNA_TITLE), alen = text_length(t->artist, TUNA_ARTIST), blen = text_length(t->album, TUNA_ALBUM);
+    uint8_t codec = t->codec ? t->codec : TUNA_IMA4; uint32_t rate = t->rate ? t->rate : TUNA_RATE;
+    if (t->title[tlen] || t->artist[alen] || t->album[blen]) return TUNA_FORMAT;
+    if (!t->samples || !tuna_profile_block(codec) || t->bytes != tuna_profile_size(t->samples, codec) ||
         (codec == TUNA_IMA4 && rate != 8192) || (codec == TUNA_ADPCM2 && rate != 8192 && rate != 4096) ||
         (codec == TUNA_DELTA1 && rate != 4096) || t->samples > rate * TUNA_MAX_SECONDS) return TUNA_FORMAT;
     memset(out, 0, TUNA_HEADER); memcpy(out, "TUNA", 4);
-    tuna_put16(out + 4, TUNA_VERSION); tuna_put16(out + 6, TUNA_HEADER);
+    tuna_put16(out + 4, TUNA_FORMAT_VERSION); tuna_put16(out + 6, TUNA_HEADER);
     out[8] = codec; tuna_put32(out + 12, rate); tuna_put32(out + 16, t->samples);
-    tuna_put32(out + 20, t->bytes); out[24] = (uint8_t)len;
-    /* Payload CRC precedes the title; header CRC covers all metadata. */
-    tuna_put32(out + 92, t->crc);
-    /* Title is 60 bytes on the wire, bounded printable ASCII. */
-    if (len > 60) return TUNA_FORMAT;
-    memcpy(out + 32, t->title, len);
+    tuna_put32(out + 20, t->bytes); out[24] = (uint8_t)tlen; out[25] = (uint8_t)alen; out[26] = (uint8_t)blen;
+    /* Payload CRC rides in the header tail; header CRC covers all metadata. */
+    tuna_put32(out + 152, t->crc);
+    memcpy(out + 32, t->title, tlen);
+    memcpy(out + 32 + TUNA_TITLE, t->artist, alen);
+    memcpy(out + 32 + TUNA_TITLE + TUNA_ARTIST, t->album, blen);
     tuna_put32(out + 28, header_crc(out));
     return TUNA_OK;
 }
 TunaError tuna_header_read(TunaTrack *t, const uint8_t *p, size_t n, uint32_t capacity) {
     unsigned i;
-    if (n < TUNA_HEADER || memcmp(p, "TUNA", 4) || tuna_u16(p + 4) != TUNA_VERSION ||
+    if (n < TUNA_HEADER || memcmp(p, "TUNA", 4) || tuna_u16(p + 4) != TUNA_FORMAT_VERSION ||
         tuna_u16(p + 6) != TUNA_HEADER || !tuna_profile_block(p[8]) || p[9] || p[10] || p[11] ||
-        p[24] > 60 || p[25] || p[26] || p[27]) return TUNA_FORMAT;
+        p[24] > TUNA_TITLE || p[25] > TUNA_ARTIST || p[26] > TUNA_ALBUM || p[27]) return TUNA_FORMAT;
+    for (i = 152 + 4; i < TUNA_HEADER; ++i) if (p[i]) return TUNA_FORMAT;
     if (tuna_u32(p + 28) != header_crc(p)) return TUNA_CRC;
-    memset(t, 0, sizeof(*t)); t->samples = tuna_u32(p + 16); t->bytes = tuna_u32(p + 20); t->crc = tuna_u32(p + 92);
+    memset(t, 0, sizeof(*t)); t->samples = tuna_u32(p + 16); t->bytes = tuna_u32(p + 20); t->crc = tuna_u32(p + 152);
     t->codec = p[8]; t->rate = tuna_u32(p + 12);
     if ((t->codec == TUNA_IMA4 && t->rate != 8192) || (t->codec == TUNA_ADPCM2 && t->rate != 8192 && t->rate != 4096) ||
         (t->codec == TUNA_DELTA1 && t->rate != 4096)) return TUNA_FORMAT;
     if (!t->samples || !t->bytes || t->samples > t->rate * TUNA_MAX_SECONDS || t->bytes != tuna_profile_size(t->samples, t->codec)) return TUNA_FORMAT;
     if (capacity < TUNA_HEADER || t->bytes > capacity - TUNA_HEADER) return TUNA_SIZE;
-    for (i = 0; i < 60; ++i) {
-        if (i < p[24]) { if (p[32 + i] < 32 || p[32 + i] > 126) return TUNA_FORMAT; t->title[i] = (char)p[32 + i]; }
-        else if (p[32 + i]) return TUNA_FORMAT;
-    }
+    if (read_text(t->title, p + 32, p[24], TUNA_TITLE) ||
+        read_text(t->artist, p + 32 + TUNA_TITLE, p[25], TUNA_ARTIST) ||
+        read_text(t->album, p + 32 + TUNA_TITLE + TUNA_ARTIST, p[26], TUNA_ALBUM)) return TUNA_FORMAT;
     return TUNA_OK;
 }
 TunaError tuna_track_validate(const uint8_t *data, size_t n, TunaTrack *t) {

@@ -179,8 +179,9 @@ or physical-drive behavior.
 Initial deployment: SD `/apps/tuna/boot.dol` plus metadata, launched with HBC.
 Routine deployment: keep Wii in HBC, set `WIILOAD=tcp:<wii-ip>` in the build
 shell and send the new DOL with Wiiload. Return cleanly to HBC on exit.
-Embed the freshly built GBA multiboot payload in the Wii DOL so the two versions
-cannot drift. Keep a version/protocol identifier visible on both screens.
+Embed the freshly built GBA multiboot payload in the Wii DOL so the two builds
+cannot drift. Keep the release version visible on both screens: it comes from
+`include/version.h` and must never be hardcoded elsewhere (see `.opencode/AGENTS.md`).
 Network logging is optional, bounded and disabled for timing measurements.
 Never install a system-menu channel/WAD just for iteration.
 

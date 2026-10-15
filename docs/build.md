@@ -73,8 +73,11 @@ Port changes or link failures can require a no-cartridge GBA reset before boot.
 Completed MP3 conversions are saved to SD `/tuna/` **before** confirmation/boot/
 transfer, including MP3s read from USB. The directory is created automatically.
 Native GC uses its SD Gecko/default FAT mount. Cache filenames include source-path
-and source-content CRCs, conversion revision and excerpt duration (`0s` means full
+and source-content CRCs, a conversion revision and excerpt duration (`0s` means full
 track), so full/excerpt modes and changed sources do not share a cache entry.
+The cache tag is `f2` for the artist/album container (format revision 2); older
+tagged files are left untouched and never matched, so an upgrade re-converts each
+track once. This is separate from the release version in `include/version.h`.
 Retries validate/reuse the saved container without another MP3 conversion; B rescans
 to list the saved files for direct selection. Cancelling or failing a transfer does
 not delete the conversion. Existing invalid cache files are left untouched with a
@@ -83,9 +86,13 @@ until a different track is prepared or the app exits. Delete unwanted old `.tuna
 files manually; interrupted `.tmp` files are not listed as tracks.
 
 Only unplug after GBA `SAFE TO UNPLUG` and host verified READY. GBA A plays,
-pauses (buffered fade-out, bounded latency), resumes, and restarts at end.
-The RAM track vanishes when the GBA is powered off or reset. Start/Home exits
-the sender; native GC deployment requires an existing suitable loader, not HBC.
+pauses (buffered fade-out, bounded latency), resumes, and restarts at end;
+L/R seek five seconds backward/forward (hold to repeat) and B returns to 0:00.
+The screen shows the track title, artist, album, codec, sample rate, encoded size,
+a progress bar, and elapsed/total time; artist/album appear only when the ID3 tags
+carry them. The RAM track vanishes when the GBA is powered off or reset.
+Start/Home exits the sender; native GC deployment requires an existing suitable
+loader, not HBC.
 
 ## Desktop conversion
 
@@ -109,10 +116,11 @@ rate changes, malformed frames, and truncated input are rejected. Stereo is
 downmixed in 32-bit arithmetic, then windowed-sinc low-pass filtered/resampled
 before block encoding. Valid Xing/LAME delay and padding metadata is honored;
 without it, actual decoded duration includes encoder padding and is always shown.
-Three-minute defaults are 2-bit ADPCM at 4096 Hz (195,936 bytes); five-minute tracks
-use 1-bit adaptive delta at 4096 Hz (172,896 bytes). These custom profiles are
+Three-minute defaults are 2-bit ADPCM at 4096 Hz (196,000-byte container); five-minute
+tracks use 1-bit adaptive delta at 4096 Hz (172,960 bytes). These custom profiles are
 explicitly lo-fi and require representative-music listening acceptance.
-Titles are bounded printable ASCII; non-ASCII filename bytes become `?`.
+Titles, artists and albums are bounded printable ASCII; non-ASCII bytes become `?`,
+and artist/album remain empty when no ID3 tag supplies them.
 
 Conversion caches repeating sinc/window FIR coefficients for 4096/8192 Hz output
 instead of recalculating trigonometric functions for every sample. The optional

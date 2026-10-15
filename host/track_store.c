@@ -22,8 +22,10 @@ TunaError tuna_cache_path(const char *directory, const char *source, unsigned ex
     }
     if (!i) stem[i++] = '_';
     stem[i] = 0;
-    /* v1 is the cache conversion revision, distinct from the wire version. */
-    if (snprintf(out, TUNA_PATH_MAX, "%s/%s-%08lx-%08lx-v1-%us.tuna", directory, stem,
+    /* f2 is the conversion cache revision for the artist/album container
+       (format revision 2), distinct from the release version. Older files are
+       simply never matched. */
+    if (snprintf(out, TUNA_PATH_MAX, "%s/%s-%08lx-%08lx-f2-%us.tuna", directory, stem,
                  (unsigned long)tuna_crc(source, strlen(source)), (unsigned long)~crc, excerpt) >= (int)TUNA_PATH_MAX) {
         out[0] = 0; return TUNA_SIZE;
     }

@@ -108,10 +108,12 @@ multiple such transactions. Respect receiver-ready/status flags; avoid overwriti
 the single-word receive register. Define byte serialization explicitly because Wii
 PowerPC is big-endian and GBA ARM is little-endian. Avoid packed-struct casts.
 
-Proposed versioned container: magic, version, header length, codec/profile,
-sample rate, sample count, encoded length, bounded title length/title, payload
-CRC32. Define byte order, padding, title encoding, and ADPCM block predictor/index
-layout before coding. Use independent blocks for decoder recovery/replay.
+Versioned container (format revision 2): magic, header length, codec/profile, sample
+rate, sample count, encoded length, bounded title/artist/album lengths and padded
+text, payload CRC32. Byte order, padding, text encoding, and ADPCM block
+predictor/index layout are fixed; artist/album are optional (empty when absent)
+and come from ID3 tags. Independent blocks are used for decoder recovery, replay,
+and sample-accurate seeking.
 
 Proposed messages: HELLO/CAPABILITIES, BEGIN, DATA, ACK/NACK, COMMIT, READY,
 ABORT, STATUS. Logical data chunks ~256 bytes initially; sequence number,
@@ -121,16 +123,21 @@ and offsets before writes. READY follows GBA validation, never just Wii send com
 
 State machine: BOOT -> WAIT -> RECEIVE -> VERIFY -> READY/PAUSED <-> PLAYING ->
 ENDED. A toggles on key-down, not every held frame. A at ENDED restarts the track.
+L/R step backward/forward five seconds (hold repeats); B returns to 0:00. Seeking
+sets the decode cursor directly, so it needs no keyframe table or extra buffer.
 Failure/early removal leaves an error state, not partially playable data. Transfer
 of a replacement track is allowed only through an explicit user flow; a second
 full-size staging buffer will not fit. No link polling is required for playback.
 
 ## Display
 
-Two colors, a tiny font, title, transfer status, elapsed/total time, play/pause
-state, and "Safe to unplug". Store glyphs compactly and expand into 4bpp tiles in
-VRAM. The GBA has no native 1bpp framebuffer mode: monochrome reduces asset size
-but does not magically reclaim ordinary EWRAM or video memory. No album art.
+Two colors (black background, white text), a tiny font, a title/artist/album
+metadata block, codec and sample rate, a progress bar, elapsed/total time,
+play/pause state, and "Safe to unplug". An inverted header/footer bar is generated
+from the same glyphs by swapping palette indices, so it stays strictly two colors.
+Store glyphs compactly and expand into 4bpp tiles in VRAM. The GBA has no native
+1bpp framebuffer mode: monochrome reduces asset size but does not magically reclaim
+ordinary EWRAM or video memory. No album art.
 
 ## Build-out sequence
 

@@ -44,6 +44,12 @@ void tuna_player_init_track(TunaPlayer *p, const uint8_t *payload, const TunaTra
     tuna_player_init(p, payload, track->samples); p->codec = track->codec;
     p->gain = tuna_gain_for_peak(tuna_track_peak(track->codec, payload, track->samples));
 }
+void tuna_player_seek(TunaPlayer *p, uint32_t position) {
+    if (position > p->samples) position = p->samples;
+    p->position = position;
+    p->block = UINT32_MAX; /* force the containing block to decode on next render */
+    if (p->state == TUNA_ENDED && position < p->samples) p->state = TUNA_PAUSED;
+}
 void tuna_player_key(TunaPlayer *p, int a_down) {
     if (a_down && !p->a_held) {
         if (p->state == TUNA_ENDED) { p->position = 0; p->block = UINT32_MAX; p->state = TUNA_PLAYING; }

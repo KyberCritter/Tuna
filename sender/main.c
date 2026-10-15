@@ -93,7 +93,7 @@ static void save_conversion(const char *path, const uint8_t *track, size_t lengt
     else printf("WARNING: cannot save to SD /tuna; conversion retained in RAM for retry.\n");
 }
 static TunaError load_track(uint8_t **track, size_t *length) {
-    const char *ext, *name; TunaError e; char key[MAX_PATH], saved[MAX_PATH];
+    const char *ext, *name; TunaError e; char key[MAX_PATH], saved[MAX_PATH], stem[MAX_PATH];
     uint8_t *data = NULL; size_t bytes = 0; int mp3;
     if (!selected) {
         strcpy(key, "embedded-jingle");
@@ -128,8 +128,10 @@ static TunaError load_track(uint8_t **track, size_t *length) {
         }
     }
     printf("Converting MP3...\n");
-    { uint64_t start = gettime();
-      e = tuna_convert_mp3(paths[selected], name, excerpt, &data, &bytes);
+    { uint64_t start = gettime(); size_t stem_len = ext ? (size_t)(ext - name) : strlen(name);
+      if (stem_len >= sizeof(stem)) stem_len = sizeof(stem) - 1;
+      memcpy(stem, name, stem_len); stem[stem_len] = 0;
+      e = tuna_convert_mp3(paths[selected], stem, excerpt, &data, &bytes);
       printf("MP3 conversion time: %.3f seconds.\n", (double)ticks_to_millisecs(gettime() - start) / 1000); }
     if (e) return e;
     save_conversion(saved, data, bytes);
@@ -187,7 +189,7 @@ int main(int argc, char **argv) {
     while (1) {
         unsigned b;
         if (redraw) {
-            printf("\x1b[2JTUNA V1 - %s -> GBA RAM\n", 
+            printf("\x1b[2JTUNA " TUNA_VERSION_STRING " - %s -> GBA RAM\n", 
 #ifdef HW_RVL
                    "native Wii SD/USB"
 #else

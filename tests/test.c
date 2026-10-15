@@ -16,7 +16,7 @@ static TunaPacket transact(TunaReceiver *r, uint8_t type, uint32_t seq, uint32_t
     CHECK(tuna_packet_read(&p, response, n) == TUNA_OK); return p;
 }
 static void format_codec(void) {
-    uint8_t block[132], header[96]; int16_t pcm[256], decoded[256]; TunaTrack t, parsed; unsigned i;
+    uint8_t block[132], header[TUNA_HEADER]; int16_t pcm[256], decoded[256]; TunaTrack t, parsed; unsigned i;
     CHECK(tuna_crc("123456789", 9) == 0xcbf43926);
     CHECK(tuna_encoded_size(UINT32_MAX) == 2214592512u);
     memset(pcm, 0, sizeof(pcm)); tuna_adpcm_encode(pcm, 256, block);
@@ -26,12 +26,17 @@ static void format_codec(void) {
     memset(block, 0, sizeof(block)); block[4] = 0xf7;
     CHECK(tuna_adpcm_decode(block, decoded) == TUNA_OK); CHECK(decoded[1] == 11); CHECK(decoded[2] == -19);
     block[2] = 89; CHECK(tuna_adpcm_decode(block, decoded) == TUNA_FORMAT);
-    memset(&t, 0, sizeof(t)); t.samples = 257; t.bytes = 264; strcpy(t.title, "Test title");
+    memset(&t, 0, sizeof(t)); t.samples = 257; t.bytes = 264;
+    strcpy(t.title, "Test title"); strcpy(t.artist, "An Artist"); strcpy(t.album, "An Album");
     CHECK(tuna_header_write(header, &t) == TUNA_OK); CHECK(header[16] == 1 && header[17] == 1);
-    CHECK(tuna_header_read(&parsed, header, 96, TUNA_CAPACITY) == TUNA_OK);
-    CHECK(!strcmp(parsed.title, t.title)); CHECK(tuna_header_read(&parsed, header, 95, TUNA_CAPACITY) == TUNA_FORMAT);
-    CHECK(tuna_header_read(&parsed, header, 96, 100) == TUNA_SIZE);
-    header[40] ^= 1; CHECK(tuna_header_read(&parsed, header, 96, TUNA_CAPACITY) == TUNA_CRC);
+    CHECK(tuna_header_read(&parsed, header, TUNA_HEADER, TUNA_CAPACITY) == TUNA_OK);
+    CHECK(!strcmp(parsed.title, t.title) && !strcmp(parsed.artist, t.artist) && !strcmp(parsed.album, t.album));
+    CHECK(tuna_header_read(&parsed, header, TUNA_HEADER - 1, TUNA_CAPACITY) == TUNA_FORMAT);
+    CHECK(tuna_header_read(&parsed, header, TUNA_HEADER, 100) == TUNA_SIZE);
+    header[40] ^= 1; CHECK(tuna_header_read(&parsed, header, TUNA_HEADER, TUNA_CAPACITY) == TUNA_CRC);
+    header[40] ^= 1;
+    /* A field that runs to the length limit without a terminator is rejected. */
+    memset(t.artist, 'A', TUNA_ARTIST + 1); CHECK(tuna_header_write(header, &t) == TUNA_FORMAT); t.artist[0] = 0;
 }
 static void transfer_player(void) {
     uint8_t *track; size_t length; TunaReceiver r; TunaPacket p; TunaTrack info; TunaPlayer player;
@@ -40,20 +45,20 @@ static void transfer_player(void) {
     CHECK(tuna_track_validate(track, length, &info) == TUNA_OK);
     tuna_receiver_init(&r, storage, sizeof(storage));
     p = transact(&r, TUNA_HELLO, 0, 0, NULL, 0); CHECK(p.type == TUNA_CAPS); CHECK(tuna_u32(p.body) == TUNA_CAPACITY);
-    p = transact(&r, TUNA_BEGIN, 0, 0, track, 96); CHECK(p.type == TUNA_ACK);
-    p = transact(&r, TUNA_DATA, 99, 0, track + 96, 256); CHECK(p.type == TUNA_NACK && r.received == 0);
+    p = transact(&r, TUNA_BEGIN, 0, 0, track, TUNA_HEADER); CHECK(p.type == TUNA_ACK);
+    p = transact(&r, TUNA_DATA, 99, 0, track + TUNA_HEADER, 256); CHECK(p.type == TUNA_NACK && r.received == 0);
     p = transact(&r, TUNA_COMMIT, 1, info.bytes, NULL, 0); CHECK(p.type == TUNA_NACK);
     while (offset < info.bytes) {
         uint16_t n = (uint16_t)(info.bytes - offset > 256 ? 256 : info.bytes - offset);
-        p = transact(&r, TUNA_DATA, seq, offset, track + 96 + offset, n); CHECK(p.type == TUNA_ACK);
-        p = transact(&r, TUNA_DATA, seq, offset, track + 96 + offset, n); CHECK(p.type == TUNA_ACK && r.received == offset + n);
+        p = transact(&r, TUNA_DATA, seq, offset, track + TUNA_HEADER + offset, n); CHECK(p.type == TUNA_ACK);
+        p = transact(&r, TUNA_DATA, seq, offset, track + TUNA_HEADER + offset, n); CHECK(p.type == TUNA_ACK && r.received == offset + n);
         offset += n; ++seq;
     }
     p = transact(&r, TUNA_COMMIT, seq, offset, NULL, 0); CHECK(p.type == TUNA_READY);
     p = transact(&r, TUNA_COMMIT, seq, offset, NULL, 0); CHECK(p.type == TUNA_READY);
     CHECK(r.state == TUNA_VERIFIED && !memcmp(track, storage, length));
     /* No receiver or link call below: retained RAM, pause, exact count, replay. */
-    tuna_player_init(&player, storage + 96, info.samples);
+    tuna_player_init(&player, storage + TUNA_HEADER, info.samples);
     CHECK(tuna_player_render(&player, audio, 256) == 0 && player.position == 0);
     tuna_player_key(&player, 1); tuna_player_key(&player, 1); CHECK(player.state == TUNA_PLAYING);
     CHECK(tuna_player_render(&player, first, 256) == 256);
@@ -64,9 +69,9 @@ static void transfer_player(void) {
     CHECK(player.position == info.samples && player.state == TUNA_ENDED);
     tuna_player_key(&player, 0); tuna_player_key(&player, 1);
     CHECK(tuna_player_render(&player, audio, 256) == 256); CHECK(!memcmp(first, audio, 256));
-    p = transact(&r, TUNA_BEGIN, 0, 0, track, 96); CHECK(p.type == TUNA_ACK && r.received == offset);
+    p = transact(&r, TUNA_BEGIN, 0, 0, track, TUNA_HEADER); CHECK(p.type == TUNA_ACK && r.received == offset);
     p = transact(&r, TUNA_ABORT, 0, 0, NULL, 0); CHECK(p.type == TUNA_ACK && r.state == TUNA_WAIT);
-    transact(&r, TUNA_BEGIN, 0, 0, track, 96); tuna_receiver_fail(&r, TUNA_TIMEOUT);
+    transact(&r, TUNA_BEGIN, 0, 0, track, TUNA_HEADER); tuna_receiver_fail(&r, TUNA_TIMEOUT);
     CHECK(r.state == TUNA_FAILED); p = transact(&r, TUNA_COMMIT, 1, offset, NULL, 0); CHECK(p.type == TUNA_NACK);
     free(track);
 }
@@ -122,17 +127,17 @@ static void boundaries(void) {
     int8_t output[300]; size_t length; unsigned i; TunaReceiver r; TunaPacket p;
     for (i = 0; i < 257; ++i) pcm[i] = (int16_t)((int)i * 128 - 16384);
     CHECK(tuna_convert_pcm(pcm, 257, TUNA_RATE, "Partial block", &track, &length) == TUNA_OK);
-    CHECK(length == 360); CHECK(tuna_track_validate(track, length, &info) == TUNA_OK);
-    tuna_player_init(&player, track + 96, 257); tuna_player_key(&player, 1);
+    CHECK(length == TUNA_HEADER + 264); CHECK(tuna_track_validate(track, length, &info) == TUNA_OK);
+    tuna_player_init(&player, track + TUNA_HEADER, 257); tuna_player_key(&player, 1);
     CHECK(tuna_player_render(&player, output, 300) == 257); CHECK(player.position == 257);
     for (i = 257; i < 300; ++i) CHECK(output[i] == 0);
-    tuna_receiver_init(&r, storage, sizeof(storage)); transact(&r, TUNA_BEGIN, 0, 0, track, 96);
-    p = transact(&r, TUNA_DATA, 1, UINT32_MAX, track + 96, 1); CHECK(p.type == TUNA_NACK && r.received == 0);
-    transact(&r, TUNA_DATA, 1, 0, track + 96, 256);
-    track[100] ^= 1;
-    p = transact(&r, TUNA_DATA, 1, 0, track + 96, 256); CHECK(p.type == TUNA_NACK && r.received == 256);
-    transact(&r, TUNA_DATA, 2, 256, track + 352, 8);
-    storage[100] ^= 1;
+    tuna_receiver_init(&r, storage, sizeof(storage)); transact(&r, TUNA_BEGIN, 0, 0, track, TUNA_HEADER);
+    p = transact(&r, TUNA_DATA, 1, UINT32_MAX, track + TUNA_HEADER, 1); CHECK(p.type == TUNA_NACK && r.received == 0);
+    transact(&r, TUNA_DATA, 1, 0, track + TUNA_HEADER, 256);
+    track[TUNA_HEADER + 4] ^= 1;
+    p = transact(&r, TUNA_DATA, 1, 0, track + TUNA_HEADER, 256); CHECK(p.type == TUNA_NACK && r.received == 256);
+    transact(&r, TUNA_DATA, 2, 256, track + TUNA_HEADER + 256, 8);
+    storage[TUNA_HEADER + 4] ^= 1;
     p = transact(&r, TUNA_COMMIT, 3, 264, NULL, 0); CHECK(p.type == TUNA_NACK && r.state == TUNA_FAILED);
     free(track);
     CHECK(tuna_convert_pcm(pcm, 257, 0, "Invalid rate", &track, &length) == TUNA_FORMAT);
@@ -155,9 +160,9 @@ static void adaptive_profiles(void) {
     CHECK(tuna_choose_profile(40 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_IMA4 && t.rate == 8192);
     CHECK(tuna_choose_profile(60 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_ADPCM2 && t.rate == 8192);
     CHECK(tuna_choose_profile(180 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_ADPCM2 && t.rate == 4096);
-    CHECK(t.bytes + 96 == 195936);
+    CHECK(t.bytes + TUNA_HEADER == 196000);
     CHECK(tuna_choose_profile(300 * 48000, 48000, &t) == TUNA_OK && t.codec == TUNA_DELTA1 && t.rate == 4096);
-    CHECK(t.bytes + 96 == 172896);
+    CHECK(t.bytes + TUNA_HEADER == 172960);
     CHECK(tuna_choose_profile(301 * 48000, 48000, &t) == TUNA_SIZE);
     memset(block, 0, sizeof(block)); block[4] = 0x0d;
     CHECK(tuna_block_decode(TUNA_ADPCM2, block, decoded) == TUNA_OK);
@@ -169,9 +174,9 @@ static void adaptive_profiles(void) {
     pcm = (int16_t *)malloc(300u * 4096 * sizeof(int16_t)); CHECK(pcm != NULL);
     for (i = 0; i < 300u * 4096; ++i) pcm[i] = (int16_t)(10000 * sin(6.283185307179586 * 220 * i / 4096));
     CHECK(tuna_convert_pcm(pcm, 300u * 4096, 4096, "Complete five-minute tone", &track, &length) == TUNA_OK);
-    CHECK(length == 172896); CHECK(tuna_track_validate(track, length, &parsed) == TUNA_OK);
+    CHECK(length == 172960); CHECK(tuna_track_validate(track, length, &parsed) == TUNA_OK);
     CHECK(parsed.samples == 1228800 && parsed.codec == TUNA_DELTA1 && parsed.rate == 4096);
-    tuna_player_init_track(&p, track + 96, &parsed); tuna_player_key(&p, 1);
+    tuna_player_init_track(&p, track + TUNA_HEADER, &parsed); tuna_player_key(&p, 1);
     while (p.state == TUNA_PLAYING) CHECK(tuna_player_render(&p, output, 256) == 256);
     CHECK(p.position == 300u * 4096);
     /* Report error as a diagnostic, not a subjective music-quality acceptance. */
@@ -254,4 +259,66 @@ static void output_level(void) {
     CHECK(p.gain == 256);
     free(quiet); free(loud);
 }
-int main(void) { format_codec(); transfer_player(); resampler(); cached_resampler(); boundaries(); adaptive_profiles(); output_level(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, output level, storage, malformed input)\n", checks); return 0; }
+static size_t put_frame(uint8_t *out, const char *id, const char *text) {
+    size_t n = strlen(text);
+    memcpy(out, id, 4); out[4] = 0; out[5] = 0; out[6] = 0; out[7] = (uint8_t)(n + 1);
+    out[8] = 0; out[9] = 0; out[10] = 0; memcpy(out + 11, text, n); return 11 + n;
+}
+static void metadata(void) {
+    TunaMeta m; uint8_t buf[256]; size_t p, n;
+    /* ID3v1 trailer fields are space padded. */
+    memset(buf, 0, sizeof(buf)); memcpy(buf + 128, "TAG", 3);
+    memset(buf + 131, ' ', 30); memcpy(buf + 131, "Title One", 9);
+    memset(buf + 161, ' ', 30); memcpy(buf + 161, "Artist Two", 10);
+    memset(buf + 191, ' ', 30); memcpy(buf + 191, "Album Three", 11);
+    tuna_id3_meta(&m, buf, sizeof(buf));
+    CHECK(!strcmp(m.title, "Title One") && !strcmp(m.artist, "Artist Two") && !strcmp(m.album, "Album Three"));
+    /* Leading ID3v2.3 frames override the trailer in the same buffer. */
+    memset(buf, 0, sizeof(buf)); memcpy(buf, "ID3", 3); buf[3] = 3; p = 10;
+    p += put_frame(buf + p, "TIT2", "V2 Title");
+    p += put_frame(buf + p, "TPE1", "V2 Artist");
+    p += put_frame(buf + p, "TALB", "V2 Album");
+    n = p - 10; buf[6] = (uint8_t)((n >> 21) & 0x7f); buf[7] = (uint8_t)((n >> 14) & 0x7f);
+    buf[8] = (uint8_t)((n >> 7) & 0x7f); buf[9] = (uint8_t)(n & 0x7f);
+    memcpy(buf + 128, "TAG", 3);
+    memset(buf + 131, ' ', 30); memcpy(buf + 131, "Old Title", 9);
+    memset(buf + 161, ' ', 30); memcpy(buf + 161, "Old Artist", 10);
+    memset(buf + 191, ' ', 30); memcpy(buf + 191, "Old Album", 9);
+    tuna_id3_meta(&m, buf, sizeof(buf));
+    CHECK(!strcmp(m.title, "V2 Title") && !strcmp(m.artist, "V2 Artist") && !strcmp(m.album, "V2 Album"));
+    /* Latin-1 high bytes become '?'; absent artist/album stay empty. */
+    memset(buf, 0, sizeof(buf)); memcpy(buf, "ID3", 3); buf[3] = 3; p = 10;
+    { const uint8_t body[5] = {0, 'A', 0x80, 'B', 0};
+      memcpy(buf + p, "TIT2", 4); buf[p + 7] = 5; memcpy(buf + p + 10, body, 5); p += 15; }
+    n = p - 10; buf[6] = (uint8_t)((n >> 21) & 0x7f); buf[7] = (uint8_t)((n >> 14) & 0x7f);
+    buf[8] = (uint8_t)((n >> 7) & 0x7f); buf[9] = (uint8_t)(n & 0x7f);
+    tuna_id3_meta(&m, buf, p);
+    CHECK(!strcmp(m.title, "A?B") && !m.artist[0] && !m.album[0]);
+    tuna_id3_meta(&m, (const uint8_t *)"not a tagged file", 17);
+    CHECK(!m.title[0] && !m.artist[0] && !m.album[0]);
+}
+static void seeking(void) {
+    uint8_t *track; size_t length; TunaTrack info; TunaPlayer ref, p; int8_t *full, part[300]; uint32_t total, pos, got, i;
+    CHECK(tuna_make_jingle(&track, &length) == TUNA_OK);
+    CHECK(tuna_track_validate(track, length, &info) == TUNA_OK);
+    total = info.samples; full = (int8_t *)malloc(total); CHECK(full != NULL);
+    tuna_player_init_track(&ref, track + TUNA_HEADER, &info); tuna_player_key(&ref, 1);
+    for (got = 0; got < total; ) { size_t k = total - got > 256 ? 256 : total - got, n = tuna_player_render(&ref, full + got, k); if (!n) break; got += (uint32_t)n; }
+    CHECK(got == total);
+    /* Mid-block seek reproduces the reference stream exactly. */
+    pos = total / 3 + 7;
+    tuna_player_init_track(&p, track + TUNA_HEADER, &info); tuna_player_seek(&p, pos); tuna_player_key(&p, 1);
+    { size_t n = tuna_player_render(&p, part, 256); CHECK(n == 256); for (i = 0; i < n; ++i) CHECK(part[i] == full[pos + i]); }
+    /* Forward clamp, backward seek from the end, then replay from zero. */
+    tuna_player_seek(&p, total + 999); CHECK(p.position == total);
+    tuna_player_init_track(&p, track + TUNA_HEADER, &info); tuna_player_key(&p, 1);
+    while (p.state == TUNA_PLAYING) tuna_player_render(&p, part, 256);
+    CHECK(p.state == TUNA_ENDED);
+    tuna_player_key(&p, 0);
+    tuna_player_seek(&p, total / 2); CHECK(p.state == TUNA_PAUSED && p.position == total / 2);
+    tuna_player_seek(&p, 0); CHECK(p.position == 0 && p.block == UINT32_MAX);
+    tuna_player_key(&p, 1);
+    { size_t n = tuna_player_render(&p, part, 256); CHECK(n == 256); for (i = 0; i < n; ++i) CHECK(part[i] == full[i]); }
+    free(full); free(track);
+}
+int main(void) { format_codec(); transfer_player(); resampler(); cached_resampler(); boundaries(); adaptive_profiles(); output_level(); metadata(); seeking(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, output level, metadata, seek, storage, malformed input)\n", checks); return 0; }

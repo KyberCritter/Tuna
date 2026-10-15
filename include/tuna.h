@@ -2,12 +2,18 @@
 #define TUNA_H
 #include <stddef.h>
 #include <stdint.h>
+#include <version.h>
 
-#define TUNA_VERSION 1u
+/* Wire/container format revision. This is NOT the release version: it only
+   changes when the on-the-wire layout changes. The release version lives in
+   version.h (TUNA_VERSION_STRING). */
+#define TUNA_FORMAT_VERSION 2u
 #define TUNA_RATE 8192u
 #define TUNA_CAPACITY (192u * 1024u)
-#define TUNA_HEADER 96u
+#define TUNA_HEADER 160u
 #define TUNA_TITLE 60u
+#define TUNA_ARTIST 30u
+#define TUNA_ALBUM 30u
 #define TUNA_BLOCK_SAMPLES 256u
 #define TUNA_BLOCK_BYTES 132u
 #define TUNA_MAX_SECONDS 300u
@@ -22,6 +28,8 @@ typedef struct {
     uint32_t samples, bytes, crc, rate;
     uint8_t codec;
     char title[TUNA_TITLE + 1];
+    char artist[TUNA_ARTIST + 1];
+    char album[TUNA_ALBUM + 1];
 } TunaTrack;
 uint16_t tuna_u16(const uint8_t *p);
 uint32_t tuna_u32(const uint8_t *p);
@@ -84,6 +92,9 @@ uint32_t tuna_track_peak(uint8_t codec, const uint8_t *payload, uint32_t samples
 uint32_t tuna_gain_for_peak(uint32_t peak);
 int8_t tuna_scale_sample(int16_t sample, uint32_t gain);
 void tuna_player_key(TunaPlayer *p, int a_down);
+/* Sample-accurate seek: blocks are independent, so this only moves the cursor
+   and forces the next render to decode the containing block. */
+void tuna_player_seek(TunaPlayer *p, uint32_t position);
 size_t tuna_player_render(TunaPlayer *p, int8_t *out, size_t count);
 
 /* Pull-based mono FIR resampler. Fetch must return the same sample on repeated indices. */
