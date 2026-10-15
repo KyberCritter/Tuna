@@ -216,4 +216,42 @@ static void track_storage(void) {
     CHECK(tuna_track_load(full, &loaded, &loaded_length) == TUNA_CRC && !loaded && !loaded_length);
     CHECK(!remove(full)); CHECK(!remove("cache-source-test.mp3")); free(track);
 }
-int main(void) { format_codec(); transfer_player(); resampler(); cached_resampler(); boundaries(); adaptive_profiles(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, storage, malformed input)\n", checks); return 0; }
+static void output_level(void) {
+    uint8_t *quiet, *loud; size_t qlen, llen; TunaTrack qinfo, linfo; TunaPlayer p;
+    int8_t audio[256]; int16_t pcm[256]; unsigned i; int peak8 = 0;
+    CHECK(tuna_gain_for_peak(0) == 256);
+    CHECK(tuna_gain_for_peak(31130) == 256);            /* at target: unity */
+    CHECK(tuna_gain_for_peak(32768) == 256);            /* never attenuate */
+    CHECK(tuna_gain_for_peak(1000) == 4096);            /* bounded, not 31x */
+    CHECK(tuna_gain_for_peak(3840) == 2075);
+    CHECK(tuna_gain_for_peak(10752) == 741);
+    CHECK(tuna_scale_sample(0, 256) == 0);
+    CHECK(tuna_scale_sample(1000, 256) == 3);           /* truncation preserved */
+    CHECK(tuna_scale_sample(-1000, 256) == -3);
+    CHECK(tuna_scale_sample(32767, 4096) == 127);
+    CHECK(tuna_scale_sample(-32768, 4096) == -128);
+    CHECK(tuna_scale_sample(32767, 256) == 127);
+    /* A quiet container is raised toward the target without exceeding int8. */
+    CHECK(tuna_make_jingle(&quiet, &qlen) == TUNA_OK);
+    CHECK(tuna_track_validate(quiet, qlen, &qinfo) == TUNA_OK);
+    { uint32_t jpeak = tuna_track_peak(qinfo.codec, quiet + TUNA_HEADER, qinfo.samples);
+      CHECK(jpeak >= 10752 && jpeak <= 11008);          /* 10000 plus codec overshoot */
+      tuna_player_init_track(&p, quiet + TUNA_HEADER, &qinfo);
+      CHECK(p.gain == tuna_gain_for_peak(jpeak));
+      CHECK(p.gain > 256 && p.gain < 4096); }
+    tuna_player_key(&p, 1);
+    while (p.state == TUNA_PLAYING) {
+        size_t n = tuna_player_render(&p, audio, 256), j;
+        for (j = 0; j < n; ++j) { if (audio[j] > peak8) peak8 = audio[j]; CHECK(audio[j] >= -128 && audio[j] <= 127); }
+    }
+    CHECK(peak8 > 100 && peak8 <= 127);                 /* clearly louder, no clipping */
+    /* A near-full-scale container stays at unity gain. */
+    for (i = 0; i < 256; ++i) pcm[i] = (int16_t)(i < 128 ? 32000 : -32000);
+    CHECK(tuna_convert_pcm(pcm, 256, TUNA_RATE, "Full scale probe", &loud, &llen) == TUNA_OK);
+    CHECK(tuna_track_validate(loud, llen, &linfo) == TUNA_OK);
+    CHECK(tuna_track_peak(linfo.codec, loud + TUNA_HEADER, linfo.samples) > 31130);
+    tuna_player_init_track(&p, loud + TUNA_HEADER, &linfo);
+    CHECK(p.gain == 256);
+    free(quiet); free(loud);
+}
+int main(void) { format_codec(); transfer_player(); resampler(); cached_resampler(); boundaries(); adaptive_profiles(); output_level(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, output level, storage, malformed input)\n", checks); return 0; }

@@ -42,6 +42,9 @@ static void __attribute__((section(".iwram"), long_call)) boundary(void) {
     start_buffer(current);
 }
 void audio_init(void) {
+    /* SOUNDBIAS centre (0x200) is the documented Direct Sound operating point.
+       Do not inherit an arbitrary post-BIOS value: a shifted bias clips one side. */
+    REG_SOUNDBIAS = 0x200;
     REG_SOUNDCNT_X = 128; REG_SOUNDCNT_L = 0; audio_stop();
     irqSet(IRQ_TIMER1, boundary); irqEnable(IRQ_TIMER1);
 }
@@ -55,7 +58,19 @@ static void fill(unsigned slot, int fade_in) {
     AudioBuffer *b = &buffers[slot]; unsigned i;
     b->count = (unsigned)tuna_player_render(&decoder, b->pcm, 256);
     b->halt = pause_pending;
-    memset(b->pcm + b->count, 0, sizeof(b->pcm) - b->count);
+    if (b->count == 256) {
+        /* The DMA streams past the buffer and reaches the FIFO about sixteen
+           samples ahead of the DAC. Give it the real continuation instead of
+           silence: if the boundary IRQ runs late the extra samples are still
+           audio, so the worst case is one duplicated word rather than an
+           audible gap. The peek is discarded, so sample counting is unchanged. */
+        uint32_t position = decoder.position, block = decoder.block;
+        TunaPlayState state = decoder.state;
+        unsigned n = (unsigned)tuna_player_render(&decoder, b->pcm + 256, 32);
+        for (i = n; i < 32; ++i) b->pcm[256 + i] = b->pcm[255];
+        decoder.position = position; decoder.block = block; decoder.state = state;
+    } else {        memset(b->pcm + b->count, 0, sizeof(b->pcm) - b->count);
+    }
     if (fade_in) for (i = 0; i < b->count && i < 32; ++i) b->pcm[i] = (int8_t)(b->pcm[i] * (int)i / 32);
     if (b->halt || decoder.position == decoder.samples) {
         unsigned n = b->count < 32 ? b->count : 32;

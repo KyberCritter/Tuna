@@ -69,7 +69,7 @@ size_t tuna_receiver_packet(TunaReceiver *r, const uint8_t *request, size_t n, u
 typedef enum { TUNA_PAUSED, TUNA_PLAYING, TUNA_ENDED } TunaPlayState;
 typedef struct {
     const uint8_t *payload;
-    uint32_t samples, position, block;
+    uint32_t samples, position, block, gain;
     unsigned in_block;
     int16_t decoded[TUNA_BLOCK_SAMPLES];
     TunaPlayState state;
@@ -77,6 +77,12 @@ typedef struct {
 } TunaPlayer;
 void tuna_player_init(TunaPlayer *p, const uint8_t *payload, uint32_t samples);
 void tuna_player_init_track(TunaPlayer *p, const uint8_t *payload, const TunaTrack *track);
+/* Output level: decoded tracks that sit well below full scale sound far too
+   quiet on the GBA's Direct Sound DAC. Gain is 8.8 fixed point (256 = unity),
+   never attenuates, and is bounded so pure silence/noise is not amplified. */
+uint32_t tuna_track_peak(uint8_t codec, const uint8_t *payload, uint32_t samples);
+uint32_t tuna_gain_for_peak(uint32_t peak);
+int8_t tuna_scale_sample(int16_t sample, uint32_t gain);
 void tuna_player_key(TunaPlayer *p, int a_down);
 size_t tuna_player_render(TunaPlayer *p, int8_t *out, size_t count);
 

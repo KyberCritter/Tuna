@@ -123,6 +123,15 @@ quality are unchanged, so existing `/tuna/` conversions remain valid. Sender
 previews report measured MP3 conversion time; loading a cached track avoids this
 work altogether.
 
+Playback applies a bounded output gain derived from the container's decoded peak
+(8.8 fixed point, unity at a 31130 target, capped at 16x, never attenuating) so
+low-amplitude tracks are not inaudibly quiet on the GBA's Direct Sound DAC. The
+container format and CRC are unchanged, so previously saved `/tuna/` conversions
+remain valid and are not re-gained on disk. Full-scale material keeps unity gain
+and is not clipped; the trade-off is that relative loudness between tracks is
+normalised rather than preserved. The Direct Sound bias (`SOUNDBIAS` 0x200) is
+set explicitly at startup.
+
 ## Regression skill
 
 `.opencode/skills/tuna-regression/` bundles repeatable guidance and a script:

@@ -154,3 +154,43 @@ native Dolphin dialogs, controller input, audio capture or Connected toggles.
   step in that run; no new retained-byte comparison is claimed for that attempt.
 - All console targets and memory/heap/IWRAM IRQ gates pass. This optimization does
   not alter the GBA audio engine or close the audible-output acceptance gates.
+
+## Playback level and continuity follow-up (2026-10-15 UTC)
+
+Reported symptom: GBA output was crackly and extremely quiet on real hardware.
+Measured causes and changes:
+
+- Level: a **loud** source is reproduced faithfully - a 0.9-amplitude MP3 decodes to
+  peak 32768, so the container/decoder chain does not attenuate. The quiet cases were
+  genuinely low-amplitude content (the embedded jingle peaks at 10798/32768 = -9.6 dB;
+  FFmpeg's `sine` fixtures peak at -18 dB). Playback now derives a bounded output gain
+  from the container's decoded peak (8.8 fixed point, unity at the 31130 target, capped
+  at 16x, never attenuating) and applies it at the 16-bit to 8-bit stage with clamping.
+  The container and its CRC are unchanged, so existing `/tuna/` files stay valid.
+- Measured on the host with `tuna-audio-probe`: jingle +9.20 dB, quiet MP3 fixtures
+  +15.3 to +17.7 dB (all reaching 30976/32768 = 94.5% peak), and a full-scale fixture
+  exactly 0.00 dB (gain 256, peak unchanged at 32768) - so full-scale material cannot
+  be clipped by the change.
+- Measured in Dolphin with WASAPI loopback capture of the same jingle: peak
+  -11.90 -> **-2.52 dBFS**, active RMS -16.40 -> **-7.11 dBFS**, a **+9.4 dB**
+  increase, matching the host prediction. Active span stayed exact (3.997 -> 3.996 s)
+  and the GBA reported `ENDED 0:04 / 0:04` with no underrun.
+- Continuity: the engine still uses the proven stop-and-wait double buffer because
+  mGBA's sound-FIFO DMA **streams forward and does not wrap**, so no ring/looping
+  design is valid. Instead the 32-byte guard region now holds the decoded
+  **continuation** (a rewind-safe peek) instead of zeros, so a boundary IRQ that runs
+  late plays real audio rather than injecting silence; the peek is discarded, so
+  sample counting and the exact final count are unchanged. `SOUNDBIAS` is now set
+  explicitly to 0x200 instead of inheriting an arbitrary post-BIOS value, which could
+  otherwise offset/clip Direct Sound on hardware. Worst-case single-sample
+  discontinuity normalised to the signal improved from 0.488 to 0.368.
+- Host suite grew to 76,359 checks, including gain/scale/saturation/peak-scan
+  boundaries, unity-gain equality with the previous truncation, and a full-scale
+  container staying at unity. All targets build; resident player is 9,676 bytes.
+- Evidence: `artifacts/emulator-20261014-225211-7d1a80f2/` (screenshots, capture,
+  analysis) against the pre-fix baseline in
+  `artifacts/emulator-20261014-221739-e3022abd/`. Remaining open gates: captured-audio
+  listening on real hardware, exact GBA sample counter/underrun instrumentation, and
+  whether the residual discontinuity is Dolphin's resampler or the codec's 256-sample
+  block seams. The automatic gain also changes relative loudness between tracks, which
+  is a deliberate trade-off for audibility on the GBA's Direct Sound output.

@@ -19,6 +19,7 @@ HOST_TEST := build/host/tests$(EXEEXT)
 LINK_TEST := build/host/link-tests$(EXEEXT)
 CONVERTER := build/host/tuna-convert$(EXEEXT)
 BUILD_TOOL := build/host/tuna-build$(EXEEXT)
+AUDIO_PROBE := build/host/tuna-audio-probe$(EXEEXT)
 ARM_NM := $(DEVKITARM)/bin/arm-none-eabi-nm
 LICENSE_FILES := $(wildcard LICENSES/*)
 LEGAL_FILES := LICENSE THIRD-PARTY-NOTICES.md $(LICENSE_FILES) \
@@ -29,7 +30,7 @@ DIST_FILES := tuna.mb tuna-convert$(EXEEXT) jingle.tuna README.md $(LEGAL_FILES)
 
 .PHONY: all host test gba embed gamecube wii package
 all: package
-host: test $(CONVERTER) build/host/jingle.tuna
+host: test $(CONVERTER) $(AUDIO_PROBE) build/host/jingle.tuna
 
 build/host:
 	mkdir -p $@
@@ -41,6 +42,8 @@ $(LINK_TEST): $(HOST) sender/link.c sender/link.h tests/link_test.c tests/stubs/
 	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -Itests/stubs -Isender $(INCLUDES) $(HOST) sender/link.c tests/link_test.c -lm -o $@
 $(BUILD_TOOL): tools/build_tool.c tools/sha256.c tools/sha256.h Makefile | build/host
 	$(CC) $(CFLAGS) -Itools tools/build_tool.c tools/sha256.c -o $@
+$(AUDIO_PROBE): $(HOST) tools/audio_probe.c $(HEADERS) Makefile | build/host
+	$(CC) $(CFLAGS) $(INCLUDES) $(HOST) tools/audio_probe.c -lm -o $@
 build/host/jingle.tuna: $(CONVERTER)
 	./$(CONVERTER) --jingle $@
 test: $(HOST_TEST) $(LINK_TEST) $(BUILD_TOOL)

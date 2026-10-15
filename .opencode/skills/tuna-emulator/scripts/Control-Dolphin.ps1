@@ -18,13 +18,21 @@ function Resume-Tuna {
 }
 function Get-TunaGbaMenu {
     $gba=Get-TunaWindow $run 'GBA'
-    [void][TunaEmulator.Native]::PostMessage([IntPtr]$gba.handle,0x7b,[IntPtr]$gba.handle,[IntPtr](-1))
+    # Qt's keyboard-context (-1) path can disappear when this widget lacks focus.
+    # Target this owned widget explicitly, with a screen point inside its window.
+    (Get-TunaElement $gba.handle).SetFocus()
+    $rect=[TunaEmulator.Native+Rect]::new()
+    if(![TunaEmulator.Native]::GetWindowRect([IntPtr]$gba.handle,[ref]$rect)){throw 'Cannot locate the owned GBA window.'}
+    $x=[int](($rect.left+$rect.right)/2);$y=[int](($rect.top+$rect.bottom)/2)
+    $point=[long](($x -band 65535) -bor (($y -band 65535) -shl 16))
+    if($point -ge 2147483648){$point-=4294967296}
+    if(![TunaEmulator.Native]::PostMessage([IntPtr]$gba.handle,0x7b,[IntPtr]$gba.handle,[IntPtr]$point)){throw 'Could not request the owned GBA menu.'}
     $deadline=[DateTime]::UtcNow.AddSeconds(5)
     do {
-        $menus=@(Get-TunaWindows $run | Where-Object title -eq 'dolphin-emu')
+        $menus=@(Get-TunaWindows $run | Where-Object { $_.title -eq 'dolphin-emu' -or $_.kind -like '*Popup*' -or (!$_.title -and $_.kind -like 'Qt*') })
         foreach($menu in $menus) {
             $r=Get-TunaElement $menu.handle
-            try { $null=Find-TunaElement $r 'Connected'; return $r } catch { }
+            try { $null=Find-TunaElement $r 'Save State'; return $r } catch { }
         }
         if([DateTime]::UtcNow -gt $deadline){throw 'No owned GBA context menu appeared.'}
         Start-Sleep -Milliseconds 100
@@ -79,7 +87,7 @@ switch($Action) {
  }
  'Connected' {
     $menu=Get-TunaGbaMenu
-    $element=Find-TunaElement $menu 'Connected'
+    try { $element=Find-TunaElement $menu 'Connected' } catch { $element=Find-TunaElement $menu 'Disconnected' }
     $p=$element.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
     $on=$p.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
     if($on -ne $Connected){Invoke-TunaElement $element}
