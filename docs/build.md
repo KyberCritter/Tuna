@@ -35,7 +35,7 @@ Outputs:
 - `build/host/tests`, `tuna-convert`, `tuna-build`, `jingle.tuna` (`.exe` on Windows)
 - `build/gba/tuna.mb`, `tuna.elf`, `tuna.map`
 - `build/gamecube/tuna.dol` and `build/wii/tuna.dol`, ELF/map files
-- `dist/apps/tuna/boot.dol` + HBC metadata (Wii), `dist/tuna-gamecube.dol`
+- `dist/apps/tuna/boot.dol`, `meta.xml` and `icon.png` (Wii), `dist/tuna-gamecube.dol`
 - `dist/tuna.mb`, converter, original jingle, licenses, SHA256 manifest
 
 Each sender embeds the freshly built multiboot image. Linker assertions reserve

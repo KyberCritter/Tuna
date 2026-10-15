@@ -25,7 +25,7 @@ LICENSE_FILES := $(wildcard LICENSES/*)
 LEGAL_FILES := LICENSE THIRD-PARTY-NOTICES.md $(LICENSE_FILES) \
 	LICENSES/minimp3-CC0.txt LICENSES/libgba.txt LICENSES/libogc.txt
 DIST_FILES := tuna.mb tuna-convert$(EXEEXT) jingle.tuna README.md $(LEGAL_FILES) \
-	tuna-gamecube.dol apps/tuna/boot.dol apps/tuna/meta.xml \
+	tuna-gamecube.dol apps/tuna/boot.dol apps/tuna/meta.xml apps/tuna/icon.png \
 	$(addprefix apps/tuna/,$(LEGAL_FILES))
 
 .PHONY: all host test gba embed gamecube wii package
@@ -73,5 +73,6 @@ package: host gamecube wii
 	cp build/gamecube/tuna.dol dist/tuna-gamecube.dol
 	cp build/wii/tuna.dol dist/apps/tuna/boot.dol
 	cp assets/meta.xml dist/apps/tuna/meta.xml
+	cp assets/icon.png dist/apps/tuna/icon.png
 	cd dist && ../$(BUILD_TOOL) sha256 $(DIST_FILES) > sha256.txt
 	@echo "Build and tests complete: dist/ (emulator/hardware acceptance is separate)."

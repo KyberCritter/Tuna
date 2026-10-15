@@ -58,7 +58,7 @@ The GameCube DOL is saved in `dist/tuna-gamecube.dol`.
 
 ### Run Tuna
 
-1. Copy the `apps/tuna/` folder from `dist/` onto a FAT32 SD card or USB device as `apps/tuna/`, so the files sit at `apps/tuna/boot.dol` (with `meta.xml` and `LICENSES/`).
+1. Copy the `apps/tuna/` folder from `dist/` onto a FAT32 SD card or USB device as `apps/tuna/`, so the files sit at `apps/tuna/boot.dol` (with `meta.xml`, `icon.png` and `LICENSES/`).
 2. Create a `music` folder at the root of the same device and copy your MP3 (or `.tuna`) files into it. Tuna searches both `/music/` and `/tuna/`, listing at most 127 files plus its embedded original jingle.
 3. Insert the storage device into the Wii, start the Homebrew Channel, and launch Tuna.
 
