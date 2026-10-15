@@ -114,6 +114,15 @@ use 1-bit adaptive delta at 4096 Hz (172,896 bytes). These custom profiles are
 explicitly lo-fi and require representative-music listening acceptance.
 Titles are bounded printable ASCII; non-ASCII filename bytes become `?`.
 
+Conversion caches repeating sinc/window FIR coefficients for 4096/8192 Hz output
+instead of recalculating trigonometric functions for every sample. The optional
+cache is bounded to 4 MiB and falls back to the original scalar resampler if its
+allocation/budget is unavailable. Tap accumulation and final normalization retain
+their original double-precision order: encoded bytes, profiles, duration and
+quality are unchanged, so existing `/tuna/` conversions remain valid. Sender
+previews report measured MP3 conversion time; loading a cached track avoids this
+work altogether.
+
 ## Regression skill
 
 `.opencode/skills/tuna-regression/` bundles repeatable guidance and a script:

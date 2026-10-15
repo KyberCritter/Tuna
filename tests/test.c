@@ -78,6 +78,35 @@ static void resampler(void) {
     for (i = 100; i < 200; ++i) { double v = tuna_resample(high_tone, NULL, 48000, 48000, i); energy += v * v; }
     CHECK(sqrt(energy / 100) < 50);
 }
+static int16_t phase_signal(void *context, uint32_t index) {
+    uint32_t value = index * 1664525u + *(const uint32_t *)context;
+    return (int16_t)(value >> 16);
+}
+static void cached_resampler(void) {
+    static const uint32_t rates[] = {8000,11025,16000,22050,32000,44100,48000};
+    uint32_t seed = 0x6f726967, random = 0x12345678; unsigned i, out, j; TunaResampler r;
+    for (i = 0; i < sizeof(rates) / sizeof(rates[0]); ++i) for (out = 4096; out <= 8192; out *= 2) {
+        uint32_t samples = rates[i] * 300, count = out * 300;
+        CHECK(tuna_resampler_init(&r, rates[i], out) == TUNA_OK && r.weights);
+        CHECK((size_t)r.phases * r.stride * sizeof(double) <= 4u * 1024u * 1024u);
+        for (j = 0; j < 2000; ++j) {
+            uint32_t index;
+            random ^= random << 13; random ^= random >> 17; random ^= random << 5;
+            index = j < 64 ? j : j < 128 ? count - 1 - (j - 64) : random % count;
+            CHECK(tuna_resampler_sample(&r, phase_signal, &seed, samples, index) ==
+                  tuna_resample_rate(phase_signal, &seed, samples, rates[i], out, index));
+        }
+        CHECK(tuna_resampler_sample(&r, phase_signal, &seed, 1, 0) == tuna_resample_rate(phase_signal, &seed, 1, rates[i], out, 0));
+        CHECK(tuna_resampler_sample(&r, phase_signal, &seed, 0, 0) == 0);
+        tuna_resampler_free(&r); CHECK(!r.weights);
+    }
+    CHECK(tuna_resampler_init(&r, 47999, 8192) == TUNA_SIZE && !r.weights);
+    CHECK(tuna_resampler_sample(&r, phase_signal, &seed, 47999, 37) == tuna_resample_rate(phase_signal, &seed, 47999, 47999, 8192, 37));
+    tuna_resampler_free(&r);
+    CHECK(tuna_resampler_init(&r, 48000, 10000) == TUNA_FORMAT && !r.weights);
+    CHECK(tuna_resampler_sample(&r, phase_signal, &seed, 48000, 37) == tuna_resample_rate(phase_signal, &seed, 48000, 48000, 10000, 37));
+    tuna_resampler_free(&r);
+}
 static void fuzz(void) {
     uint32_t random = 0x12345678; unsigned i, j; TunaPacket p; TunaTrack t; TunaReceiver r;
     tuna_receiver_init(&r, storage, sizeof(storage));
@@ -187,4 +216,4 @@ static void track_storage(void) {
     CHECK(tuna_track_load(full, &loaded, &loaded_length) == TUNA_CRC && !loaded && !loaded_length);
     CHECK(!remove(full)); CHECK(!remove("cache-source-test.mp3")); free(track);
 }
-int main(void) { format_codec(); transfer_player(); resampler(); boundaries(); adaptive_profiles(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, storage, malformed input)\n", checks); return 0; }
+int main(void) { format_codec(); transfer_player(); resampler(); cached_resampler(); boundaries(); adaptive_profiles(); track_storage(); fuzz(); printf("PASS: %u checks (codec, format, protocol, retained-RAM player, FIR, storage, malformed input)\n", checks); return 0; }

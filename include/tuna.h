@@ -85,7 +85,18 @@ typedef int16_t (*TunaSampleFn)(void *context, uint32_t index);
 int16_t tuna_resample(TunaSampleFn fetch, void *context, uint32_t input_samples,
                       uint32_t input_rate, uint32_t output_index);
 int16_t tuna_resample_rate(TunaSampleFn fetch, void *context, uint32_t input_samples,
-                           uint32_t input_rate, uint32_t output_rate, uint32_t output_index);
+                            uint32_t input_rate, uint32_t output_rate, uint32_t output_index);
+/* Optional bounded phase-coefficient cache for byte-identical 4096/8192 Hz FIR.
+   A failed init leaves a usable scalar fallback; free after the conversion. */
+typedef struct {
+    double *weights;
+    uint32_t input_rate, output_rate, phases;
+    unsigned radius, stride;
+} TunaResampler;
+TunaError tuna_resampler_init(TunaResampler *r, uint32_t input_rate, uint32_t output_rate);
+int16_t tuna_resampler_sample(const TunaResampler *r, TunaSampleFn fetch, void *context,
+                              uint32_t input_samples, uint32_t output_index);
+void tuna_resampler_free(TunaResampler *r);
 void tuna_jingle(int16_t *out, uint32_t count);
 uint32_t tuna_boot_key(uint32_t padded_size);
 uint32_t tuna_boot_crc(uint32_t crc, uint32_t word);

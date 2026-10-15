@@ -18,18 +18,20 @@
 #define MAX_MP3 (16u * 1024u * 1024u)
 static int16_t sample(void *context, uint32_t i) { return ((const int16_t *)context)[i]; }
 static TunaError convert_source(TunaSampleFn fetch, void *context, uint32_t count, uint32_t rate, const char *title, uint8_t **track, size_t *length) {
-    TunaTrack info; uint32_t pos; uint8_t *data; int16_t pcm[256]; unsigned i; TunaError e;
+    TunaTrack info; TunaResampler resampler = {0}; uint32_t pos; uint8_t *data; int16_t pcm[256]; unsigned i; TunaError e;
     *track = NULL; *length = 0;
     if (!fetch || !count || rate < 4096 || rate > 48000) return TUNA_FORMAT;
     memset(&info, 0, sizeof(info)); e = tuna_choose_profile(count, rate, &info); if (e) return e;
     for (i = 0; i < TUNA_TITLE && title[i]; ++i) info.title[i] = title[i] >= 32 && title[i] <= 126 ? title[i] : '?';
     data = (uint8_t *)malloc(TUNA_HEADER + info.bytes);
     if (!data) return TUNA_IO;
+    if (rate != info.rate) (void)tuna_resampler_init(&resampler, rate, info.rate);
     for (pos = 0; pos < info.samples; pos += 256) {
         unsigned n = info.samples - pos > 256 ? 256 : info.samples - pos;
-        for (i = 0; i < n; ++i) pcm[i] = rate == info.rate ? fetch(context, pos + i) : tuna_resample_rate(fetch, context, count, rate, info.rate, pos + i);
+        for (i = 0; i < n; ++i) pcm[i] = rate == info.rate ? fetch(context, pos + i) : tuna_resampler_sample(&resampler, fetch, context, count, pos + i);
         tuna_block_encode(info.codec, pcm, n, data + TUNA_HEADER + (pos / 256) * tuna_profile_block(info.codec));
     }
+    tuna_resampler_free(&resampler);
     info.crc = tuna_crc(data + TUNA_HEADER, info.bytes);
     if (tuna_header_write(data, &info)) { free(data); return TUNA_FORMAT; }
     *track = data; *length = TUNA_HEADER + info.bytes; return TUNA_OK;

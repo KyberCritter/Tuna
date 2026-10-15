@@ -135,3 +135,22 @@ native Dolphin dialogs, controller input, audio capture or Connected toggles.
   GC SD Gecko, real SD/USB/cable hardware, captured audio, disconnect during DATA/ACK,
   and low-rate profile quality/performance gates remain open. The historical BIOS
   absence above no longer blocks the locally tested BIOS/link lanes.
+
+## Conversion performance follow-up (2026-10-15 UTC)
+
+- The bounded repeating-phase FIR cache passed 28,074 additional exact scalar
+  comparison/budget/fallback checks, including track edges and 300-second indices
+  at standard MP3 input rates. Total host format/storage/FIR suite: 43,569 checks.
+- All generated MP3 regression containers matched their pre-optimization SHA-256
+  values, including complete 180/300-second tracks and the explicit excerpt. The
+  180-second stereo host benchmark improved from 4.442 s to 0.877 s (5.07x) with
+  exactly the same output SHA-256. This is a local single-run host measurement,
+  not a claimed real-Wii benchmark.
+- Dolphin's native Wii build converted the generated four-second mono MP3 in
+  0.869 guest-clock seconds, saved it to SD `/tuna/`, and reached GBA READY with
+  the unchanged payload CRC `b315346b` and title/duration. Evidence:
+  `artifacts/emulator-20261014-222646-5dd79b7d/` and
+  `artifacts/conversion-baseline/`. The state-export helper failed its context-menu
+  step in that run; no new retained-byte comparison is claimed for that attempt.
+- All console targets and memory/heap/IWRAM IRQ gates pass. This optimization does
+  not alter the GBA audio engine or close the audible-output acceptance gates.

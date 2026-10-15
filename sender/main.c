@@ -1,4 +1,5 @@
 #include <gccore.h>
+#include <ogc/lwp_watchdog.h>
 #include <fat.h>
 #include <dirent.h>
 #include <stdio.h>
@@ -127,7 +128,10 @@ static TunaError load_track(uint8_t **track, size_t *length) {
         }
     }
     printf("Converting MP3...\n");
-    e = tuna_convert_mp3(paths[selected], name, excerpt, &data, &bytes); if (e) return e;
+    { uint64_t start = gettime();
+      e = tuna_convert_mp3(paths[selected], name, excerpt, &data, &bytes);
+      printf("MP3 conversion time: %.3f seconds.\n", (double)ticks_to_millisecs(gettime() - start) / 1000); }
+    if (e) return e;
     save_conversion(saved, data, bytes);
 prepared:
     free(prepared_track); prepared_track = data; prepared_length = bytes; strcpy(prepared_key, key);
